@@ -98,15 +98,21 @@ HC_id_list = [f[-4:] for f in files if f[:2] == 'HC']
 PD_id_list = [f[-4:] for f in files if f[:2] == 'PD']
 HC_train, HC_test = make_train_test_split(HC_id_list)
 PD_train, PD_test = make_train_test_split(PD_id_list)
+
 prevalence, train_data = [], []
 mels_list, y, id = [], [], []
+X_emb, y_emb = [], []
 for file in files:
     x, _ = librosa.core.load(dir + file + '.wav', sr=None)
-    status = file[:2]
+
+    # MFCC training data
     mfcc = get_mfcc(x, sample_rate=sr)
     # mels = mfcc
+
+    # Mel spectrogram training data
     mels = calc_mels(x)
     mels_list.append(mels)
+    status = file[:2]
     if status == 'PD':
         indication = 1
         prevalence.append('PD')
@@ -116,6 +122,7 @@ for file in files:
     y.extend([indication] * mels.shape[0])
     id.extend([file[-4:]] * mels.shape[0])
     train_data.extend([str(file[-4:]) in PD_train + HC_train] * mels.shape[0])
+
 
 X = np.vstack(mels_list)
 y = np.array(y)
