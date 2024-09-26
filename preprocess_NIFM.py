@@ -4,7 +4,7 @@ import librosa
 import librosa.display
 import numpy as np
 import random
-from transformers import AutoModel
+from transformers import AutoProcessor, AutoModelForAudioClassification
 
 
 dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios\\"
@@ -12,8 +12,8 @@ dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios\\"
 sr = 44100  # Sampling rate
 frame_size = 1024  # Number of samples per frame
 frame_step = 256  # Number of samples between successive frames
-fmin = 20  # Min frequency to use in Mel spectrogram
-fmax = sr // 2  # Max frequency; Nyquist frequency
+fmin = 20  # Min f0 to use in Mel spectrogram
+fmax = 400  # Max f0
 n_mels = 28  # Number of mel bands to generate
 
 
@@ -37,13 +37,17 @@ PD_id_list = [f[-4:] for f in files if f[:2] == 'PD']
 HC_train, HC_test = make_train_test_split(HC_id_list)
 PD_train, PD_test = make_train_test_split(PD_id_list)
 
-model = AutoModel.from_pretrained("vumichien/nonsemantic-speech-trillsson3")
+# model = TFAutoModel.from_pretrained("vumichien/nonsemantic-speech-trillsson3")
+
+
+processor = AutoProcessor.from_pretrained("superb/wav2vec2-base-superb-sid")
+model = AutoModelForAudioClassification.from_pretrained("superb/wav2vec2-base-superb-sid")
 
 prevalence, train_data = [], []
 mels_list, y, id = [], [], []
 X_emb, y_emb = [], []
 for file in files:
-    x, _ = librosa.core.load(dir + file + '.wav', sr=None)
+    x, _ = librosa.core.load(dir + file + '.wav', sr=16000)
     embeddings = model(x)
 
 # OpenL3 embedding training data

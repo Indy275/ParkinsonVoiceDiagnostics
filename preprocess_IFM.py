@@ -1,19 +1,23 @@
-import os
-import re
+import os.path
+
 import librosa
 import librosa.display
 import numpy as np
 import random
+from disvoice.prosody import Prosody
+from disvoice.phonation import Phonation
 
-dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios\\"
+from data_util.file_util import load_files
+import get_features
 
 sr = 44100  # Sampling rate
 frame_size = 1024  # Number of samples per frame
 frame_step = 256  # Number of samples between successive frames
 fmin = 20  # Min frequency to use in Mel spectrogram
-fmax = sr // 2  # Max frequency; Nyquist frequency
+fmax = sr // 2  # Max frequency
 n_mels = 28  # Number of mel bands to generate
 
+dataset = 'italian2'
 
 def make_train_test_split(id_list, test_size=0.3, seed=1):
     """
@@ -26,115 +30,86 @@ def make_train_test_split(id_list, test_size=0.3, seed=1):
     return train_set, test_set
 
 
-def normalize(x):
-    """
-    Z-Score normalization of an array
+def preprocess_data(dataset):
+    if dataset.lower() == 'neurovoz':
+        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios\\"
+        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\NeuroVoz_preprocessed\\'
+    elif dataset.lower() == 'czech':
+        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\CzechPD\\modified_records\\"
+        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\Czech_preprocessed\\'
+    elif dataset.lower() == 'test':
+        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\subsample\\"
+        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\test_preprocessed\\'
+    elif dataset.lower() == 'italian':  # sample-level phonation features
+        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\ItalianPD\\records\\"
+        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\Italian_preprocessed\\'
+    elif dataset.lower() == 'italian2':  # file-level phonation features
+        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\ItalianPD\\records\\"
+        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\Italian2_preprocessed\\'
+    if not os.path.exists(store_location):
+        os.makedirs(store_location)
 
-    (subtract mean and divide by standard deviation)
+    files, HC_id_list, PD_id_list = load_files(dir)
 
-    :param x : array of float
-            the array to be normalized
+    HC_train, HC_test = make_train_test_split(HC_id_list)
+    PD_train, PD_test = make_train_test_split(PD_id_list)
 
-    :return array of float
-            the normalized array
-    """
-    eps = 0.001
-    if np.std(x) != 0:
-        x = (x - np.mean(x)) / np.std(x)
-    else:
-        x = (x - np.mean(x)) / eps
-    return x
+    print("Found {} speakers, of which {} PD and {} HC.".format(len(HC_id_list)+len(PD_id_list), len(PD_id_list), len(HC_id_list)))
 
-
-def calc_mels(x):
-    """
-    Calculates and returns the Mel features from a given waveform
-
-    :param x : list
-            the waveform of the audio signal of the file
-    :param sr : int
-            the sample rate of the media files
-    :param n_mels : int
-            the number of mel bands to generate
-    :param frame_step : int
-            the number of samples between successive frames
-    :param frame_size : int
-            the number of samples per frame
-    :param fmin : int
-             min frequency to use in Mel spectrogram
-    :param fmax : int
-            max frequency to use in Mel spectrogram
-
-    :return list of list of float
-            the computed Mel coefficients representing the audio file
-    """
-    x = np.array(x)
-    spectrogram = librosa.feature.melspectrogram(y=x[:-1],
-                                                 sr=sr,
-                                                 n_mels=n_mels,
-                                                 hop_length=frame_step,
-                                                 n_fft=frame_size,
-                                                 fmin=fmin,
-                                                 fmax=fmax)
-    mels = librosa.power_to_db(spectrogram).astype(np.float32)
-    mels = normalize(mels)
-    mels = mels.transpose()
-    mels[np.isnan(mels)] = 0
-    return mels
+    print("The train set consists of {} PD and {} HC speakers.".format(len(PD_train), len(HC_train)))
+    print("The test set consists of {} PD and {} HC speakers.".format(len(PD_test), len(HC_test)))
 
 
-def get_mfcc(raw_data, sample_rate):
-    mfcc_features_matrix = librosa.feature.mfcc(y=raw_data, sr=sample_rate, n_mfcc=13, n_fft=frame_size,
-                                                hop_length=frame_step)
-    return mfcc_features_matrix.T
+    prevalence, train_data = [], []
+    X, y, subj_id, sample_id = [], [], [], []
+    id_count = 0
 
+    for file in files:
+        x, _ = librosa.core.load(os.path.join(dir, file)+ '.wav', sr=16000)
 
-files = []
-for file in os.listdir(dir):
-    if re.match(r"^[A-Z]{2}_[A]\d_\d+$", file[2:-4]):
-        files.append(file[2:-4])
+        # Prosodic features
+        # prosody = Prosody()
+        # prosodic_features = prosody.extract_features_file(os.path.join(dir, file)+ '.wav', static=False, plots=False, fmt="npy")
+        # prosodic_features = prosodic_features.reshape(1,-1)
 
-HC_id_list = [f[-4:] for f in files if f[:2] == 'HC']
-PD_id_list = [f[-4:] for f in files if f[:2] == 'PD']
-HC_train, HC_test = make_train_test_split(HC_id_list)
-PD_train, PD_test = make_train_test_split(PD_id_list)
+        # Phonation features
+        phon = Phonation()
+        features = phon.extract_features_file(os.path.join(dir, file)+ '.wav', static=True, plots=False, fmt="npy")
 
-prevalence, train_data = [], []
-mels_list, y, id = [], [], []
-X_emb, y_emb = [], []
-for file in files:
-    x, _ = librosa.core.load(dir + file + '.wav', sr=None)
+        X.extend(features)
 
-    # MFCC training data
-    mfcc = get_mfcc(x, sample_rate=sr)
-    # mels = mfcc
+        status = file[:2]
+        if status == 'PD':
+            indication = 1
+            prevalence.append('PD')
+        else:
+            indication = 0  # 'HC'
+            prevalence.append('HC')
+        # y.extend([indication] )
+        # subj_id.extend([file[-4:]] )
+        # sample_id.extend([id_count] )
+        # train_data.extend([str(file[-4:]) in PD_train + HC_train] )
+        y.extend([indication] * features.shape[0])
+        subj_id.extend([file[-4:]] * features.shape[0])
+        sample_id.extend([id_count] * features.shape[0])
+        train_data.extend([str(file[-4:]) in PD_train + HC_train] * features.shape[0])
+        id_count += 1
 
-    # Mel spectrogram training data
-    mels = calc_mels(x)
-    mels_list.append(mels)
-    status = file[:2]
-    if status == 'PD':
-        indication = 1
-        prevalence.append('PD')
-    else:
-        indication = 0  # 'HC'
-        prevalence.append('HC')
-    y.extend([indication] * mels.shape[0])
-    id.extend([file[-4:]] * mels.shape[0])
-    train_data.extend([str(file[-4:]) in PD_train + HC_train] * mels.shape[0])
+    X = np.vstack(X)
+    y = np.array(y)
+    subj_id = np.array(subj_id)
+    sample_id = np.array(sample_id)
+    train_data = np.array(train_data)
 
+    print("Of the {} files, {} are from PD patients and {} are from HC".format(len(prevalence),
+                                                                               len([i for i in prevalence if i == 'PD']),
+                                                                               len([i for i in prevalence if i == 'HC'])))
+    print(X.shape, y.shape, subj_id.shape, sample_id.shape, train_data.shape)
 
-X = np.vstack(mels_list)
-y = np.array(y)
-id = np.array(id)
-train_data = np.array(train_data)
+    np.save(store_location+'X.npy', X)
+    np.save(store_location+'y.npy', y)
+    np.save(store_location+'subj_id.npy', subj_id)
+    np.save(store_location+'sample_id.npy', sample_id)
+    np.save(store_location+'train_data.npy', train_data)
 
-print("Of the {} files, {} are from PD patients and {} are from HC".format(len(prevalence),
-                                                                           len([i for i in prevalence if i == 'PD']),
-                                                                           len([i for i in prevalence if i == 'HC'])))
-print(X.shape, y.shape, id.shape, train_data.shape)
-
-np.save('C:\\Users\\INDYD\\Documents\\ParkinsonVoiceDiagnostics\\NeuroVoz_preprocessed\\X.npy', X)
-np.save('C:\\Users\\INDYD\\Documents\\ParkinsonVoiceDiagnostics\\NeuroVoz_preprocessed\\y.npy', y)
-np.save('C:\\Users\\INDYD\\Documents\\ParkinsonVoiceDiagnostics\\NeuroVoz_preprocessed\\id.npy', id)
-np.save('C:\\Users\\INDYD\\Documents\\ParkinsonVoiceDiagnostics\\NeuroVoz_preprocessed\\train_data.npy', train_data)
+preprocess_data(dataset)
