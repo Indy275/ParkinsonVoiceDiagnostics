@@ -1,6 +1,13 @@
+import os.path
+
 import librosa
 import librosa.display
 import numpy as np
+
+from data_util.file_util import load_files
+from data_util.preprocess import make_train_test_split
+import get_ifm_features, get_nifm_features
+
 sr = 44100  # Sampling rate
 frame_size = 1024  # Number of samples per frame
 frame_step = 256  # Number of samples between successive frames
@@ -8,84 +15,94 @@ fmin = 20  # Min frequency to use in Mel spectrogram
 fmax = sr // 2  # Max frequency
 n_mels = 28  # Number of mel bands to generate
 
+dataset = 'neurovoz2'
+ifm_or_nifm = 'ifm'
 
-def normalize(x):
-    """
-    Z-Score normalization of an array
 
-    (subtract mean and divide by standard deviation)
-
-    :param x : array of float
-            the array to be normalized
-
-    :return array of float
-            the normalized array
-    """
-    eps = 0.001
-    if np.std(x) != 0:
-        x = (x - np.mean(x)) / np.std(x)
+def get_dirs(dataset):
+    if dataset.lower() == 'neurovoz':  # sample-level phonation features
+        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios\\"
+        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\NeuroVoz_preprocessed\\'
+    if dataset.lower() == 'neurovoz2':  # file-level phonation features
+        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios\\"
+        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\NeuroVoz2_preprocessed\\'
+    elif dataset.lower() == 'czech':
+        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\CzechPD\\modified_records\\"
+        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\Czech_preprocessed\\'
+    elif dataset.lower() == 'test':
+        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\subsample\\"
+        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\test_preprocessed\\'
+    elif dataset.lower() == 'italian':  # sample-level phonation features
+        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\ItalianPD\\records\\"
+        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\Italian_preprocessed\\'
+    elif dataset.lower() == 'italian2':  # file-level phonation features
+        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\ItalianPD\\records\\"
+        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\Italian2_preprocessed\\'
     else:
-        x = (x - np.mean(x)) / eps
-    return x
+        print(" '{}' is not a valid data set ".format(dataset))
+        return
+    if not os.path.exists(store_location):
+        os.makedirs(store_location)
+    return dir, store_location
 
 
-def calc_mels(x):
-    """
-    Calculates and returns the Mel features from a given waveform
+def create_features(dataset, ifm_nifm):
+    dir, store_location = get_dirs(dataset)
 
-    :param x : list
-            the waveform of the audio signal of the file
-    :param sr : int
-            the sample rate of the media files
-    :param n_mels : int
-            the number of mel bands to generate
-    :param frame_step : int
-            the number of samples between successive frames
-    :param frame_size : int
-            the number of samples per frame
-    :param fmin : int
-             min frequency to use in Mel spectrogram
-    :param fmax : int
-            max frequency to use in Mel spectrogram
+    files, HC_id_list, PD_id_list = load_files(dir)
 
-    :return list of list of float
-            the computed Mel coefficients representing the audio file
-    """
-    x = np.array(x)
-    spectrogram = librosa.feature.melspectrogram(y=x,
-                                                 sr=sr,
-                                                 n_mels=n_mels,
-                                                 hop_length=frame_step,
-                                                 n_fft=frame_size,
-                                                 fmin=fmin,
-                                                 fmax=fmax)
-    mels = librosa.power_to_db(spectrogram).astype(np.float32)
-    mels = normalize(mels)
-    mels = mels.transpose()
-    mels[np.isnan(mels)] = 0
-    return mels
+    HC_train, HC_test = make_train_test_split(HC_id_list)
+    PD_train, PD_test = make_train_test_split(PD_id_list)
+
+    print("Found {} speakers, of which {} PD and {} HC.".format(len(HC_id_list)+len(PD_id_list), len(PD_id_list), len(HC_id_list)))
+
+    print("The train set consists of {} PD and {} HC speakers.".format(len(PD_train), len(HC_train)))
+    print("The test set consists of {} PD and {} HC speakers.".format(len(PD_test), len(HC_test)))
+
+    prevalence, train_data = [], []
+    X, y, subj_id, sample_id = [], [], [], []
+    id_count = 0
+
+    for file in files:
+        path_to_file =os.path.join(dir, file)+ '.wav'
+        x, _ = librosa.core.load(path_to_file, sr=16000)
+
+        if ifm_nifm == 'ifm':
+           features = get_ifm_features.get_features(path_to_file)
+
+        else:
+            features = get_nifm_features.get_features()
+
+        status = file[:2]
+        if status == 'PD':
+            indication = 1
+            prevalence.append('PD')
+        else:
+            indication = 0  # 'HC'
+            prevalence.append('HC')
+        X.extend(features)
+        y.extend([indication] * features.shape[0])
+        subj_id.extend([file[-4:]] * features.shape[0])
+        sample_id.extend([id_count] * features.shape[0])
+        train_data.extend([str(file[-4:]) in PD_train + HC_train] * features.shape[0])
+        id_count += 1
+
+    X = np.vstack(X)
+    y = np.array(y)
+    subj_id = np.array(subj_id)
+    sample_id = np.array(sample_id)
+    train_data = np.array(train_data)
+
+    print("Of the {} files, {} are from PD patients and {} are from HC".format(len(prevalence),
+                                                                               len([i for i in prevalence if i == 'PD']),
+                                                                               len([i for i in prevalence if i == 'HC'])))
+    print(X.shape, y.shape, subj_id.shape, sample_id.shape, train_data.shape)
+
+    np.save(store_location+'X{}.npy'.format(ifm_nifm), X)
+    np.save(store_location+'y.npy', y)
+    np.save(store_location+'subj_id.npy', subj_id)
+    np.save(store_location+'sample_id.npy', sample_id)
+    np.save(store_location+'train_data.npy', train_data)
 
 
-def get_mfcc(raw_data, sample_rate):
-    mfcc_features_matrix = librosa.feature.mfcc(y=raw_data, sr=sample_rate, n_mfcc=13, n_fft=frame_size,
-                                                hop_length=frame_step)
-    return mfcc_features_matrix.T
-
-
-def get_features(x):
-    feature_list = []
-    x = x[len(x)%frame_size:]
-
-    # MFCC training data
-    mfcc = get_mfcc(x, sample_rate=sr)
-
-    # Mel spectrogram training data
-    mels_list = []
-    mels = calc_mels(x)
-    mels_list.append(mels)
-    mels_array = np.array(mels_list)
-    mels_array = mels_array.squeeze()
-
-    feature_list.extend(np.concatenate((mfcc, mels_array), axis=1))
-    return np.array(feature_list)
-
+create_features(dataset, ifm_or_nifm)
