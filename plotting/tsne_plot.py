@@ -5,15 +5,18 @@ import pandas as pd
 
 import seaborn as sns
 
-store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\NeuroVoz_preprocessed\\'
+dataset = 'Czech'  # NeuroVoz Italian Czech test
+ifm_or_nifm = 'ifm'
+file_or_window = 'file'
 
-X = np.load(store_location + 'X.npy')
-y = np.load(store_location + 'y.npy')
-subj_id = np.load(store_location + 'subj_id.npy')
-sample_id = np.load(store_location + 'sample_id.npy')
-train_data = np.load(store_location + 'train_data.npy')
+store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\{}_preprocessed\\'.format(dataset)
 
-print(y, subj_id, train_data)
+X = np.load(store_location + 'X_{}_{}.npy'.format(ifm_or_nifm, file_or_window))
+y = np.load(store_location + 'y_{}_{}.npy'.format(ifm_or_nifm, file_or_window))
+subj_id = np.load(store_location + 'subj_id_{}_{}.npy'.format(ifm_or_nifm, file_or_window))
+sample_id = np.load(store_location + 'sample_id_{}_{}.npy'.format(ifm_or_nifm, file_or_window))
+train_data = np.load(store_location + 'train_data_{}_{}.npy'.format(ifm_or_nifm, file_or_window))
+
 print(X.shape, y.shape)
 
 tsne = TSNE(n_components=2, verbose=0, perplexity=40, max_iter=400)
