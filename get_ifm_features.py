@@ -101,12 +101,12 @@ def get_prosodic_features(path_to_file):
     return prosodic_features
 
 
-def get_phonation_features(path_to_file):
+def get_phonation_features(path_to_file, static_or_dynamic):
     # Phonation features
     phon = Phonation()
-    phonation_features = phon.extract_features_file(path_to_file, static=True, plots=False, fmt="npy")
+    phonation_features = phon.extract_features_file(path_to_file, static=static_or_dynamic, plots=False, fmt="npy")
     return phonation_features
 
 
-def get_features(path_to_file):
-    return get_phonation_features(path_to_file)
+def get_features(path_to_file, static_or_dynamic):
+    return get_phonation_features(path_to_file, static_or_dynamic)

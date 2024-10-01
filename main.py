@@ -1,17 +1,17 @@
-import numpy as np
-from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
-import pandas as pd
+import get_features, models
 
-import seaborn as sns
+dataset = 'Czech'  # NeuroVoz Italian Czech test
+ifm_or_nifm = 'ifm'
+file_or_window = 'file'  # if True, get static file-level descriptors. If False, get window-level descriptors
+recreate_features = True
 
-store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\NeuroVoz_preprocessed\\'
 
-sr = 44100  # Sampling rate
-frame_size = 500  # Number of samples per frame
-frame_step = 250  # Number of samples between successive frames
-fmin = 20  # Min frequency to use in Mel spectrogram
-fmax = sr // 2  # Max frequency; Nyquist frequency
-n_mels = 28  # Number of mel bands to generate
+if ifm_or_nifm == 'ifm':
+    ifm_or_nifm += '_{}'.format(file_or_window)
+if recreate_features:
+    print("Creating {} features for '{}' dataset ".format(ifm_or_nifm, dataset))
+    get_features.create_features(dataset, ifm_or_nifm)
 
-################## To be used later on in the project, to run various pipelines easily at once. Currently not used.
+print("Now running the ML model ".format(ifm_or_nifm, dataset))
+
+models.run_ml_model(dataset, ifm_or_nifm)

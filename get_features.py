@@ -1,11 +1,8 @@
 import os.path
-
-import librosa
-import librosa.display
 import numpy as np
 
 from data_util.file_util import load_files
-from data_util.preprocess import make_train_test_split
+from data_util.data_util import make_train_test_split
 import get_ifm_features, get_nifm_features
 
 sr = 44100  # Sampling rate
@@ -15,15 +12,12 @@ fmin = 20  # Min frequency to use in Mel spectrogram
 fmax = sr // 2  # Max frequency
 n_mels = 28  # Number of mel bands to generate
 
-dataset = 'neurovoz2'
-ifm_or_nifm = 'ifm'
-
 
 def get_dirs(dataset):
     if dataset.lower() == 'neurovoz':  # sample-level phonation features
         dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios\\"
         store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\NeuroVoz_preprocessed\\'
-    if dataset.lower() == 'neurovoz2':  # file-level phonation features
+    elif dataset.lower() == 'neurovoz2':  # file-level phonation features
         dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios\\"
         store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\NeuroVoz2_preprocessed\\'
     elif dataset.lower() == 'czech':
@@ -65,13 +59,23 @@ def create_features(dataset, ifm_nifm):
 
     for file in files:
         path_to_file =os.path.join(dir, file)+ '.wav'
-        x, _ = librosa.core.load(path_to_file, sr=16000)
 
-        if ifm_nifm == 'ifm':
-           features = get_ifm_features.get_features(path_to_file)
+        if ifm_nifm[:3] == 'ifm':
+            if ifm_nifm[-4:] == 'file':
+                static = True
+            elif ifm_nifm[-6:] == 'window':
+                static = False
+            else:
+                print("Something went wrong:", ifm_nifm)
+                return
 
+            features = get_ifm_features.get_features(path_to_file, static)
+        elif ifm_nifm[:4] == 'ifm':
+            features = get_nifm_features.get_features(path_to_file)
+            features = np.squeeze(features)
         else:
-            features = get_nifm_features.get_features()
+            print("Something went wrong:", ifm_nifm)
+            return
 
         status = file[:2]
         if status == 'PD':
@@ -98,11 +102,8 @@ def create_features(dataset, ifm_nifm):
                                                                                len([i for i in prevalence if i == 'HC'])))
     print(X.shape, y.shape, subj_id.shape, sample_id.shape, train_data.shape)
 
-    np.save(store_location+'X{}.npy'.format(ifm_nifm), X)
-    np.save(store_location+'y.npy', y)
-    np.save(store_location+'subj_id.npy', subj_id)
-    np.save(store_location+'sample_id.npy', sample_id)
-    np.save(store_location+'train_data.npy', train_data)
-
-
-create_features(dataset, ifm_or_nifm)
+    np.save(store_location+'X_{}.npy'.format(ifm_nifm), X)
+    np.save(store_location+'y_{}.npy'.format(ifm_nifm), y)
+    np.save(store_location+'subj_id_{}.npy'.format(ifm_nifm), subj_id)
+    np.save(store_location+'sample_id_{}.npy'.format(ifm_nifm), sample_id)
+    np.save(store_location+'train_data_{}.npy'.format(ifm_nifm), train_data)
