@@ -1,5 +1,6 @@
 import os.path
 import numpy as np
+import pandas as pd
 
 from data_util.file_util import load_files
 from data_util.data_util import make_train_test_split
@@ -15,11 +16,8 @@ n_mels = 28  # Number of mel bands to generate
 
 def get_dirs(dataset):
     if dataset.lower() == 'neurovoz':  # sample-level phonation features
-        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios\\"
+        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios_A\\"
         store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\NeuroVoz_preprocessed\\'
-    elif dataset.lower() == 'neurovoz2':  # file-level phonation features
-        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios\\"
-        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\NeuroVoz2_preprocessed\\'
     elif dataset.lower() == 'czech':
         dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\CzechPD\\modified_records\\"
         store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\Czech_preprocessed\\'
@@ -29,9 +27,6 @@ def get_dirs(dataset):
     elif dataset.lower() == 'italian':  # sample-level phonation features
         dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\ItalianPD\\records\\"
         store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\Italian_preprocessed\\'
-    elif dataset.lower() == 'italian2':  # file-level phonation features
-        dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\ItalianPD\\records\\"
-        store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\Italian2_preprocessed\\'
     else:
         print(" '{}' is not a valid data set ".format(dataset))
         return
@@ -58,7 +53,7 @@ def create_features(dataset, ifm_nifm):
     id_count = 0
 
     for file in files:
-        path_to_file =os.path.join(dir, file)+ '.wav'
+        path_to_file =os.path.join(dir, file) + '.wav'
 
         if ifm_nifm[:3] == 'ifm':
             if ifm_nifm[-4:] == 'file':
@@ -92,10 +87,13 @@ def create_features(dataset, ifm_nifm):
         id_count += 1
 
     X = np.vstack(X)
-    y = np.array(y)
-    subj_id = np.array(subj_id)
-    sample_id = np.array(sample_id)
-    train_data = np.array(train_data)
+    y = np.array(y).reshape(-1, 1)
+    subj_id = np.array(subj_id).reshape(-1, 1)
+    sample_id = np.array(sample_id).reshape(-1, 1)
+    train_data = np.array(train_data).reshape(-1, 1)
+
+    data = np.hstack((X, y, subj_id, sample_id, train_data))
+    df = pd.DataFrame(data=data, columns=list(range(X.shape[1]))+['y', 'subject', 'sample', 'traintest'])
 
     print("Of the {} files, {} are from PD patients and {} are from HC".format(len(prevalence),
                                                                                len([i for i in prevalence if i == 'PD']),
@@ -107,3 +105,5 @@ def create_features(dataset, ifm_nifm):
     np.save(store_location+'subj_id_{}.npy'.format(ifm_nifm), subj_id)
     np.save(store_location+'sample_id_{}.npy'.format(ifm_nifm), sample_id)
     np.save(store_location+'train_data_{}.npy'.format(ifm_nifm), train_data)
+
+    df.to_csv(store_location+"data_{}.csv".format(ifm_nifm))
