@@ -21,15 +21,11 @@ def normalize(x):
     :param x : array of float
             the array to be normalized
 
-    :return array of float
+    return array of float
             the normalized array
     """
-    eps = 0.001
-    if np.std(x) != 0:
-        x = (x - np.mean(x)) / np.std(x)
-    else:
-        x = (x - np.mean(x)) / eps
-    return x
+    eps = 1e-5
+    return (x - np.mean(x)) / (eps + np.std(x))
 
 
 def calc_mels(x):
@@ -51,7 +47,7 @@ def calc_mels(x):
     :param fmax : int
             max frequency to use in Mel spectrogram
 
-    :return list of list of float
+    return list of list of float
             the computed Mel coefficients representing the audio file
     """
     x = np.array(x)
