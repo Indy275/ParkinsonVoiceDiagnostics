@@ -1,8 +1,15 @@
 import os, re, shutil
+import configparser
+
+config = configparser.ConfigParser()
+parent = os.path.dirname
+config.read(os.path.join(parent(parent(__file__)), 'settings.ini'))
+data_dir = config['DATA_SETTINGS']['data_dir']
+
 
 def rename_neurovoz_files():
-    dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios\\"
-    modified_dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\audios_A\\"
+    dir = data_dir + "NeuroVoz\\audios\\"
+    modified_dir = data_dir + "NeuroVoz\\audios_A\\"
     files = []
     for file in os.listdir(dir):
         if re.match(r"^[A-Z]{2}_A\d_\d+$", file[:-4]):
@@ -10,10 +17,11 @@ def rename_neurovoz_files():
             files.append(file[:-4])
             shutil.copy(os.path.join(dir, file), os.path.join(modified_dir, file))
     print(len(files))
-rename_neurovoz_files()
+
+
 def rename_czech_files():
-    dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\CzechPD\\records\\"
-    modified_dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\CzechPD\\modified_records\\"
+    dir = data_dir + "CzechPD\\records\\"
+    modified_dir = data_dir + "CzechPD\\modified_records\\"
     files = []
     for file in os.listdir(dir):
         if re.match(r"^[A-Z]{2}\d+a\d$", file[:-4]):
@@ -28,8 +36,8 @@ def rename_czech_files():
 
 
 def rename_italian_files():
-    dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\ItalianPD\\15 Young Healthy Control\\"
-    modified_dir = "C:\\Users\\INDYD\\Documents\\RAIVD_data\\ItalianPD\\records\\"
+    dir = data_dir + "ItalianPD\\15 Young Healthy Control\\"
+    modified_dir = data_dir + "ItalianPD\\records\\"
 
     new_id = 56
     for root, dirs, files in os.walk(dir):

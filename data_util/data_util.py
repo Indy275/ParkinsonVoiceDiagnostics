@@ -1,6 +1,13 @@
 import random
 import numpy as np
 import pandas as pd
+import configparser
+import os
+
+config = configparser.ConfigParser()
+parent = os.path.dirname
+config.read(os.path.join(parent(parent(__file__)), 'settings.ini'))
+data_dir = config['DEFAULT']['data_dir']
 
 
 def make_train_test_split(id_list, test_size=0.3, seed=1):
@@ -14,20 +21,22 @@ def make_train_test_split(id_list, test_size=0.3, seed=1):
     return train_set, test_set
 
 
-def load_data(dataset, ifm_nifm):
-    store_location = 'C:\\Users\\INDYD\\Documents\\RAIVD_data\\preprocessed_data\\{}_preprocessed\\'.format(dataset)
+def old_load_data(dataset, ifm_nifm):
+    store_location = data_dir + 'preprocessed_data\\{}_preprocessed\\'.format(dataset)
 
     X = np.load(store_location + 'X_{}.npy'.format(ifm_nifm))
     y = np.load(store_location + 'y_{}.npy'.format(ifm_nifm))
     subj_id = np.load(store_location + 'subj_id_{}.npy'.format(ifm_nifm))
     sample_id = np.load(store_location + 'sample_id_{}.npy'.format(ifm_nifm))
     train_data = np.load(store_location + 'train_data_{}.npy'.format(ifm_nifm))
+    return X, y, subj_id, sample_id, train_data
 
-    # TODO place dataframe creation to feature extraction
-    n_features = X.shape[1]
-    data = np.hstack((X, y, subj_id, sample_id, train_data))
-    df = pd.DataFrame(data=data, columns=[str(x) for x in list(range(n_features))] + ['y', 'subj_id', 'sample_id', 'train_test'])
 
+def load_data(dataset, ifm_nifm):
+    store_location = data_dir + 'preprocessed_data\\{}_preprocessed\\'.format(dataset)
+
+    df = pd.read_csv(store_location+'data_{}.csv'.format(ifm_nifm))
+    n_features = len(df.columns) - 4  # Ugly coding, but does the trick: all columns except last 4 are features
     return df, n_features
 
 
@@ -47,3 +56,16 @@ def split_data(X, y, train_data):
                                                                                               float(sum(y_test) / len(
                                                                                                   y_test) * 100)))
     return X_train, X_test, y_train, y_test
+
+
+def npy_to_df(dataset, ifm_nifm):
+    store_location = data_dir + 'preprocessed_data\\{}_preprocessed\\'.format(dataset)
+    X, y, subj_id, sample_id, train_data = old_load_data(dataset, ifm_nifm)
+
+    y = y.reshape(-1, 1)
+    subj_id = subj_id.reshape(-1, 1)
+    sample_id =sample_id.reshape(-1, 1)
+    train_data = train_data.reshape(-1, 1)
+    data = np.hstack((X, y, subj_id, sample_id, train_data))
+    df = pd.DataFrame(data=data, columns=list(range(X.shape[1])) + ['y', 'subject_id', 'sample_id', 'train_test'])
+    df.to_csv(store_location + 'data_{}.csv'.format(ifm_nifm), )
