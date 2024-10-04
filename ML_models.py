@@ -1,19 +1,19 @@
-import numpy as np
-import math
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
-from sklearn.model_selection import GridSearchCV
-from statistics import mode
 
-from data_util.data_util import load_data, split_data
+from data_util.data_util import load_data
 from eval import evaluate_predictions
 
 
 def run_ml_model(dataset, ifm_nifm):
-    X, y, subj_id, sample_ids, train_data = load_data(dataset, ifm_nifm)
-    X_train, X_test, y_train, y_test = split_data(X, y, train_data)
-    print(X.shape, y.shape, subj_id.shape, sample_ids.shape, train_data.shape)
+    df, n_features = load_data(dataset, ifm_nifm)
+    df['train_test'] = df['train_test'].astype(bool)
+    X_train = df[df['train_test']].iloc[:, :n_features]
+    X_test = df[~df['train_test']].iloc[:, :n_features]
+    y_train = df[df['train_test']]['y']
+    y_test = df[~df['train_test']]['y']
 
+    print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
     rfc = RandomForestClassifier(random_state=11)
     xgb = XGBClassifier()
     classifiers = [rfc, xgb]
@@ -21,36 +21,20 @@ def run_ml_model(dataset, ifm_nifm):
     for clf, clf_name in zip(classifiers, clf_names):
         print("Fitting {}".format(clf_name))
         clf.fit(X_train, y_train)
+        test_df = df[~df['train_test']]
         preds = clf.predict(X_test)
-        evaluate_predictions(clf_name+'Window', y_test, preds)
+        test_df.loc[:, 'preds'] = preds
+
+        evaluate_predictions(clf_name + 'Window', y_test.tolist(), test_df['preds'].tolist())
 
         if ifm_nifm[-4] == 'n':  # wiNdow or Nifm; majority voting only sensible for window-level predictions
-            print("before sorting")
-            print(sum(y_test), len(y_test))
-            print(sample_ids)
-            print(y_test)
-            print(preds)
-            sample_ids = list(sample_ids)
-            # sorted_lists = sorted(zip(sample_id, y_test, preds), key=lambda i: i[0])
-            # sorted_samples, sorted_ytest, sorted_preds = zip(*sorted_lists)
-            # sorted_samples = list(sorted_samples)
-            # sorted_ytest = list(sorted_ytest)
-            # sorted_preds = list(sorted_preds)
+            samples_preds = test_df.groupby('sample_id').agg({'preds': lambda x: x.mode()[0]}).reset_index()
+            samples_ytest = test_df.groupby('sample_id').agg({'y': lambda x: x.mode()[0]}).reset_index()
 
-            samples_ytest, samples_preds = [], []
-            # loop through unique items
-            for sampleid in np.unique(sample_ids):
-                i = sample_ids.index(sampleid)  # Get first occurrence of sample_id
-                x = sample_ids.count(sampleid)  # Get length of sample
-                sample_prediction = mode(preds[i:i+x])
-                print("sampleid:", sampleid)
-                print(y_test[i:i+x])
-                print(preds[i:i+x])
-                samples_ytest.append(y_test[i])
-                samples_preds.append(sample_prediction)
-        if clf_name == 'Random Forest Classifier':
+            evaluate_predictions(clf_name + 'Sample', samples_ytest['y'].tolist(), samples_preds['preds'].tolist())
 
-            print(clf.feature_importances_)
-        break
+        if clf_name == 'Random Forest Classifier' and n_features < 100:
+            print(*zip(df.columns[:n_features], clf.feature_importances_))
+        break  # Remove this line
 
-            # evaluate_predictions(clf_name+'Sample', samples_ytest, samples_preds)
+
