@@ -1,5 +1,6 @@
 import numpy as np
 import librosa
+import scipy.stats
 
 from disvoice.prosody import Prosody
 from disvoice.phonation import Phonation
@@ -66,27 +67,29 @@ def calc_mels(x):
 
 
 def get_mfcc(raw_data, sample_rate):
-    mfcc_features_matrix = librosa.feature.mfcc(y=raw_data, sr=sample_rate, n_mfcc=13, n_fft=frame_size,
-                                                hop_length=frame_step)
-    return mfcc_features_matrix.T
+    mfcc = librosa.feature.mfcc(y=raw_data, sr=sample_rate, n_mfcc=13, n_fft=frame_size,
+                                hop_length=frame_step)
+    mfccd = librosa.feature.delta(data=mfcc, order=1)
+    mfccdd = librosa.feature.delta(data=mfcc, order=2)
+    mfcc_matrix = np.vstack((mfcc, mfccd, mfccdd))
+    return mfcc_matrix.T
 
 
-def get_mel_features(x):
-    feature_list = []
+def get_mel_features(path_to_file, static):
+    sr = 16000
+    x, _ = librosa.core.load(path_to_file, sr=sr)
     x = x[len(x) % frame_size:]
 
     # MFCC training data
     mfcc = get_mfcc(x, sample_rate=sr)
+    if static:
+        mean_mfcc = np.mean(mfcc, axis=0)
+        std_mfcc = np.std(mfcc, axis=0)
+        skew_mfcc = scipy.stats.skew(mfcc, axis=0)
+        kurt_mfcc = scipy.stats.kurtosis(mfcc, axis=0)
+        mfcc = np.hstack((mean_mfcc, std_mfcc, skew_mfcc, kurt_mfcc)).reshape((1,-1))
 
-    # Mel spectrogram training data
-    mels_list = []
-    mels = calc_mels(x)
-    mels_list.append(mels)
-    mels_array = np.array(mels_list)
-    mels_array = mels_array.squeeze()
-
-    feature_list.extend(np.concatenate((mfcc, mels_array), axis=1))
-    return np.array(feature_list)
+    return mfcc
 
 
 def get_prosodic_features(path_to_file):
@@ -101,8 +104,11 @@ def get_phonation_features(path_to_file, static_or_dynamic):
     # Phonation features
     phon = Phonation()
     phonation_features = phon.extract_features_file(path_to_file, static=static_or_dynamic, plots=False, fmt="npy")
+    print("phon",static_or_dynamic, np.shape(phonation_features))
     return phonation_features
 
 
 def get_features(path_to_file, static_or_dynamic):
-    return get_phonation_features(path_to_file, static_or_dynamic)
+    get_phonation_features(path_to_file, static_or_dynamic)
+    return get_mel_features(path_to_file, static_or_dynamic)
+    # return get_phonation_features(path_to_file, static_or_dynamic)

@@ -8,6 +8,7 @@ target_dataset = config['DATA_SETTINGS']['target_dataset']
 
 ifm_or_nifm = config['EXPERIMENT_SETTINGS']['ifm_or_nifm']
 file_or_window = config['DATA_SETTINGS']['file_or_window']
+clf = config['MODEL_SETTINGS']['clf']
 
 recreate_features = config.getboolean('RUN_SETTINGS', 'recreate_features')
 run_models = config.getboolean('RUN_SETTINGS', 'run_models')
@@ -27,10 +28,13 @@ if recreate_features:
     get_features.create_features(target_dataset, ifm_or_nifm)
 
 if run_models:
-    import ML_models
     print("Now running the {} ML model for '{}' dataset ".format(ifm_or_nifm, base_dataset))
-    ML_models.run_ml_model(base_dataset, ifm_or_nifm)
-    # models.run_cnn_model(dataset, ifm_or_nifm)
+    if clf in ['RFC', 'XGB']:
+        import ML_models
+        ML_models.run_ml_model(base_dataset, ifm_or_nifm)
+    elif clf in ['CNN']:
+        import DNN_models
+        DNN_models.run_cnn_model(base_dataset, ifm_or_nifm)
 
 if run_tl_models:
     import ML_TL_model

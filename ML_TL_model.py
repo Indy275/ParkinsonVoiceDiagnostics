@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+pd.options.mode.chained_assignment = None  # default='warn'
 from sklearn.ensemble import RandomForestClassifier
 import random
 from copy import deepcopy
@@ -28,10 +29,10 @@ def run_experiment(base_dataset, target_dataset, ifm_nifm):
     X_train = base_df.iloc[:, :train_features]
     y_train = base_df['y']
 
-    print("X_train:", X_train.shape, "; y_train: ", y_train.shape, "; target_df: ", target_df.shape)
+    print("X_train:", X_train.shape, "\ny_train: ", y_train.shape, "\ntarget_df: ", target_df.shape)
     rfc = RandomForestClassifier(random_state=11)
     classifiers = [rfc]
-    clf_names = ['Random Forest Classifier']  # , 'XGBoost Classifier']
+    clf_names = ['RFC']  # , 'XGB']
     for clf, clf_name in zip(classifiers, clf_names):
         print("Fitting {} to train data".format(clf_name))
         train_model(clf, X_train, y_train)
@@ -64,6 +65,7 @@ def run_experiment(base_dataset, target_dataset, ifm_nifm):
             y_target_test = target_test_df['y']
             predictions = clf_copy.predict(X_target_test)
             target_test_df.loc[:, 'preds'] = predictions
+            print(pos_train_samples, neg_train_samples)
 
             metrics_list.append(evaluate_predictions(clf_name + '0{}shot'.format(n_shots),y_target_test, predictions))
             n_tgt_train_samples.append(n_shots)
@@ -77,11 +79,11 @@ def run_experiment(base_dataset, target_dataset, ifm_nifm):
 
         metrics_df = pd.DataFrame(metrics_list, columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
         metrics_df['Iteration'] = n_tgt_train_samples
-        metrics_df.to_csv('experiments\\metrics_{}_{}.csv'.format(base_dataset, target_dataset), index=False)
+        metrics_df.to_csv('experiments\\{}metrics_{}_{}.csv'.format(clf_name,base_dataset, target_dataset), index=False)
 
         if ifm_nifm[-4] == 'n':  # wiNdow or Nifm; majority voting only sensible for window-level predictions
             metrics_grouped = pd.DataFrame(metrics_list, columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
             metrics_grouped['Iteration'] = n_tgt_train_samples
-            metrics_grouped.to_csv('experiments\\metrics_{}_{}_grouped.csv'.format(base_dataset, target_dataset), index=False)
+            metrics_grouped.to_csv('experiments\\{}metrics_{}_{}_grouped.csv'.format(clf_name,base_dataset, target_dataset), index=False)
 
 

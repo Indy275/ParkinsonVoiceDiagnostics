@@ -1,3 +1,6 @@
+import numpy as np
+import math
+from sklearn.model_selection import GridSearchCV
 from typing import List, Dict, Union, Tuple, Optional
 from tensorflow.keras import Sequential
 from tensorflow.keras.layers import Input, SeparableConv1D, Dense, Flatten
@@ -6,6 +9,9 @@ from tensorflow.keras.layers import Dropout
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.callbacks import EarlyStopping
 from scikeras.wrappers import KerasClassifier
+
+from data_util.data_util import load_data
+from eval import evaluate_predictions
 
 # Constants
 N_EPOCHS = 150
@@ -55,10 +61,20 @@ def create_nn(
 
 
 def run_cnn_model(dataset, ifm_nifm):
-    X, y, subj_id, sample_id, train_data = load_data(dataset, ifm_nifm)
-    X_train, X_test, y_train, y_test = split_data(X, y, train_data)
-    X_src_train_tensor = np.array(X_train)
-    y_src_train_split = np.array(y_train).reshape(-1)
+    df, n_features = load_data(dataset, ifm_nifm)
+    df['train_test'] = df['train_test'].astype(bool)
+    X_train = df[df['train_test']].iloc[:, :n_features]
+    X_test = df[~df['train_test']].iloc[:, :n_features]
+    y_train = df[df['train_test']]['y']
+    y_test = df[~df['train_test']]['y']
+
+    X_src_train_tensor = np.array(X_train).reshape(1, -1, n_features)
+    y_src_train_split = np.array(y_train).reshape(1, -1)
+
+    X_src_test_tensor = np.array(X_test).reshape(1, -1, n_features)
+    y_src_test_split = np.array(y_test).reshape(1, -1)
+
+    print(X_src_train_tensor.shape, y_src_train_split.shape, X_src_test_tensor.shape, y_src_test_split.shape)
     cv = GridSearchCV(
         estimator=KerasClassifier(
             model=create_nn,
@@ -81,3 +97,5 @@ def run_cnn_model(dataset, ifm_nifm):
         n_jobs=1
     )
     cv.fit(X_src_train_tensor, y_src_train_split)
+    predictions = cv.predict(X_src_test_tensor)
+    evaluate_predictions('DeepNN', y_src_test_split, predictions)

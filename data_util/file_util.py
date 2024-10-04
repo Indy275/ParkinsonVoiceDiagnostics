@@ -9,18 +9,18 @@ data_dir = config['DATA_SETTINGS']['data_dir']
 
 
 def get_dirs(dataset):
-    if dataset.lower() == 'neurovoz':  # sample-level phonation features
+    if dataset.lower() == 'neurovoz':
         folder = 'NeuroVoz'
         dir = data_dir + folder + '\\audios_A\\'
-    elif dataset.lower() == 'czech':
+    elif dataset.lower() == 'czechpd':
         folder = 'CzechPD'
         dir = data_dir + folder + "\\modified_records\\"
-    elif dataset.lower() == 'test':
-        folder = 'NeuroVoz'
-        dir = data_dir + folder + "\\subsample\\"
-    elif dataset.lower() == 'italian':  # sample-level phonation features
+    elif dataset.lower() == 'italianpd':
         folder = 'ItalianPD'
         dir = data_dir + folder + "\\records\\"
+    elif dataset.lower() == 'test':
+        folder = 'test'
+        dir = data_dir + "\\NeuroVoz\\subsample\\"
     else:
         print(" '{}' is not a valid data set ".format(dataset))
         return

@@ -1,8 +1,11 @@
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
-
+import pandas as pd
 from data_util.data_util import load_data
 from eval import evaluate_predictions
+import numpy as np
+
+pd.options.mode.chained_assignment = None  # default='warn'
 
 
 def run_ml_model(dataset, ifm_nifm):
@@ -12,6 +15,9 @@ def run_ml_model(dataset, ifm_nifm):
     X_test = df[~df['train_test']].iloc[:, :n_features]
     y_train = df[df['train_test']]['y']
     y_test = df[~df['train_test']]['y']
+
+    print("Train subjects:", np.sort(df[df['train_test']]['subject_id'].unique()))
+    print("Test subjects:", np.sort(df[~df['train_test']]['subject_id'].unique()))
 
     print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
     rfc = RandomForestClassifier(random_state=11)
@@ -36,5 +42,3 @@ def run_ml_model(dataset, ifm_nifm):
         if clf_name == 'Random Forest Classifier' and n_features < 100:
             print(*zip(df.columns[:n_features], clf.feature_importances_))
         break  # Remove this line
-
-
