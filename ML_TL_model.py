@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+
 pd.options.mode.chained_assignment = None  # default='warn'
 from sklearn.ensemble import RandomForestClassifier
 import random
@@ -45,7 +46,7 @@ def run_experiment(base_dataset, target_dataset, ifm_nifm):
             pos_subjs = list(target_df[target_df['y'] == 1]['subject_id'].unique())
             neg_subjs = list(target_df[target_df['y'] == 0]['subject_id'].unique())
 
-            if n_shots > min(len(pos_subjs), len(neg_subjs))-5:
+            if n_shots > min(len(pos_subjs), len(neg_subjs)) - 5:
                 n_shots = min(len(pos_subjs), len(neg_subjs)) - 5  # -5 to ensure at least 5 test samples
 
             random.seed(1)
@@ -67,7 +68,7 @@ def run_experiment(base_dataset, target_dataset, ifm_nifm):
             target_test_df.loc[:, 'preds'] = predictions
             print(pos_train_samples, neg_train_samples)
 
-            metrics_list.append(evaluate_predictions(clf_name + '0{}shot'.format(n_shots),y_target_test, predictions))
+            metrics_list.append(evaluate_predictions(clf_name + '0{}shot'.format(n_shots), y_target_test, predictions))
             n_tgt_train_samples.append(n_shots)
 
             if ifm_nifm[-4] == 'n':  # wiNdow or Nifm; majority voting only sensible for window-level predictions
@@ -75,15 +76,18 @@ def run_experiment(base_dataset, target_dataset, ifm_nifm):
                 samples_ytest = target_test_df.groupby('sample_id').agg({'y': lambda x: x.mode()[0]}).reset_index()
 
                 metrics_grouped.append(
-                    evaluate_predictions(clf_name + 'Sample', samples_ytest['y'].tolist(), samples_preds['preds'].tolist()))
+                    evaluate_predictions(clf_name + 'Sample', samples_ytest['y'].tolist(),
+                                         samples_preds['preds'].tolist()))
 
         metrics_df = pd.DataFrame(metrics_list, columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
         metrics_df['Iteration'] = n_tgt_train_samples
-        metrics_df.to_csv('experiments\\{}metrics_{}_{}.csv'.format(clf_name,base_dataset, target_dataset), index=False)
+        metrics_df.to_csv('experiments\\{}metrics_{}_{}.csv'.format(clf_name, base_dataset, target_dataset),
+                          index=False)
+        print('Metrics saved to: experiments\\{}metrics_{}_{}.csv'.format(clf_name, base_dataset, target_dataset))
 
         if ifm_nifm[-4] == 'n':  # wiNdow or Nifm; majority voting only sensible for window-level predictions
-            metrics_grouped = pd.DataFrame(metrics_list, columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
-            metrics_grouped['Iteration'] = n_tgt_train_samples
-            metrics_grouped.to_csv('experiments\\{}metrics_{}_{}_grouped.csv'.format(clf_name,base_dataset, target_dataset), index=False)
-
+            metrics_grouped_df = pd.DataFrame(metrics_grouped, columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
+            metrics_grouped_df['Iteration'] = n_tgt_train_samples
+            metrics_grouped_df.to_csv(
+                'experiments\\{}metrics_{}_{}_grouped.csv'.format(clf_name, base_dataset, target_dataset), index=False)
 

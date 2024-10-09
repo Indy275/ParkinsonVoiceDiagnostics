@@ -3,6 +3,7 @@ from sklearn.manifold import TSNE
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from data_util.data_util import load_data
 
 import configparser
 import os
@@ -12,26 +13,25 @@ parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'settings.ini'))
 data_dir = config['DATA_SETTINGS']['data_dir']
 
-dataset = 'Czech'  # NeuroVoz Italian Czech test
+dataset = 'ItalianPD'  # NeuroVoz ItalianPD CzechPD test
 ifm_or_nifm = 'ifm'
 file_or_window = 'file'
 
-store_location = data_dir + 'preprocessed_data\\{}_preprocessed\\'.format(dataset)
+if ifm_or_nifm == 'ifm':
+    ifm_or_nifm += '_{}'.format(file_or_window)
 
-X = np.load(store_location + 'X_{}_{}.npy'.format(ifm_or_nifm, file_or_window))
-y = np.load(store_location + 'y_{}_{}.npy'.format(ifm_or_nifm, file_or_window))
-subj_id = np.load(store_location + 'subj_id_{}_{}.npy'.format(ifm_or_nifm, file_or_window))
-sample_id = np.load(store_location + 'sample_id_{}_{}.npy'.format(ifm_or_nifm, file_or_window))
-train_data = np.load(store_location + 'train_data_{}_{}.npy'.format(ifm_or_nifm, file_or_window))
+df, n_features = load_data(dataset, ifm_or_nifm)
+X = df.iloc[:, :n_features]
+y = df['y']
 
 print(X.shape, y.shape)
 
-tsne = TSNE(n_components=2, verbose=0, perplexity=40, max_iter=400)
+tsne = TSNE(n_components=2, verbose=0, perplexity=10, max_iter=400)
 tsne_results = tsne.fit_transform(X)
 
 df = pd.DataFrame(columns=['tsne-2d-one', 'tsne-2d-two', 'y'])
-df['tsne-2d-one'] = tsne_results[:,0]
-df['tsne-2d-two'] = tsne_results[:,1]
+df['tsne-2d-one'] = tsne_results[:, 0]
+df['tsne-2d-two'] = tsne_results[:, 1]
 df['y'] = y
 
 plt.figure(figsize=(8, 8))
