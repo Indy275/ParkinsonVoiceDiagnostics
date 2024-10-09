@@ -4,19 +4,19 @@ import scipy.stats
 
 from disvoice.prosody import Prosody
 from disvoice.phonation import Phonation
+import parselmouth
+from parselmouth.praat import call
 
-sr = 44100  # Sampling rate
-frame_size = 1024  # Number of samples per frame
-frame_step = 256  # Number of samples between successive frames
+sr = 16000  # Sampling rate
+frame_size = int(0.04 * sr)  # Number of samples per frame
+frame_step = int(0.02 * sr)  # Number of samples between successive frames
 fmin = 20  # Min frequency to use in Mel spectrogram
 fmax = sr // 2  # Max frequency
-n_mels = 28  # Number of mel bands to generate
 
 
 def normalize(x):
     """
     Z-Score normalization of an array
-
     (subtract mean and divide by standard deviation)
 
     :param x : array of float
@@ -29,86 +29,122 @@ def normalize(x):
     return (x - np.mean(x)) / (eps + np.std(x))
 
 
-def calc_mels(x):
-    """
-    Calculates and returns the Mel features from a given waveform
+def get_f0(sound, static):
+    pitch = call(sound, "To Pitch", 0.0, fmin, fmax)
+    meanF0 = call(pitch, "Get mean", 0, 0, 'Hertz')
+    stdevF0 = call(pitch, "Get standard deviation", 0, 0, 'Hertz')
+    minF0 = call(pitch, "Get minimum", 0, 0, 'Hertz', 'parabolic')
+    maxF0 = call(pitch, "Get maximum", 0, 0, 'Hertz', 'parabolic')
 
-    :param x : list
-            the waveform of the audio signal of the file
-    :param sr : int
-            the sample rate of the media files
-    :param n_mels : int
-            the number of mel bands to generate
-    :param frame_step : int
-            the number of samples between successive frames
-    :param frame_size : int
-            the number of samples per frame
-    :param fmin : int
-             min frequency to use in Mel spectrogram
-    :param fmax : int
-            max frequency to use in Mel spectrogram
-
-    return list of list of float
-            the computed Mel coefficients representing the audio file
-    """
-    x = np.array(x)
-    spectrogram = librosa.feature.melspectrogram(y=x,
-                                                 sr=sr,
-                                                 n_mels=n_mels,
-                                                 hop_length=frame_step,
-                                                 n_fft=frame_size,
-                                                 fmin=fmin,
-                                                 fmax=fmax)
-    mels = librosa.power_to_db(spectrogram).astype(np.float32)
-    mels = normalize(mels)
-    mels = mels.transpose()
-    mels[np.isnan(mels)] = 0
-    return mels
+    pitch_values = pitch.selected_array['frequency']
+    df0 = np.diff(pitch_values, 1)
+    ddf0 = np.diff(df0, 1)
+    
+    meandF0 = df0.mean()
+    meanddF0 = ddf0.mean()
+    measuresF0 = np.hstack((meanF0, stdevF0, minF0, maxF0, meandF0, meanddF0)).reshape((1, -1))
+    # f0, _, _ = librosa.pyin(sound, fmin=fmin, fmax=fmax, sr=sr, frame_length=frame_size, hop_length=frame_step)
+    # if static:
+    #     f0 = f0[f0 != 0]
+    #     df0 = np.diff(f0, 1)
+    #     ddf0 = np.diff(df0, 1)
+    #     df0_mean = np.mean(df0)
+    #     ddf0_mean = np.mean(ddf0)
+    #     f0_mean, f0_std, f0_skew, f0_kurt = np.mean(f0), np.std(f0), scipy.stats.skew(f0), scipy.stats.kurtosis(f0)
+    #     f0_max, f0_min = np.max(f0), np.min(f0)
+    #     f0_measures = np.hstack((df0_mean, ddf0_mean, f0_mean, f0_std, f0_skew, f0_kurt, f0_max, f0_min))
+    #     return f0_measures.reshape((1, -1))
+    return measuresF0
 
 
-def get_mfcc(raw_data, sample_rate):
-    mfcc = librosa.feature.mfcc(y=raw_data, sr=sample_rate, n_mfcc=13, n_fft=frame_size,
+def measurePitch(sound, f0min, f0max):
+    pointProcess = call(sound, "To PointProcess (periodic, cc)", f0min, f0max)
+    localJitter = call(pointProcess, "Get jitter (local)", 0, 0, 0.0001, 0.02, 1.3)
+    localabsoluteJitter = call(pointProcess, "Get jitter (local, absolute)", 0, 0, 0.0001, 0.02, 1.3)
+    rapJitter = call(pointProcess, "Get jitter (rap)", 0, 0, 0.0001, 0.02, 1.3)
+    ppq5Jitter = call(pointProcess, "Get jitter (ppq5)", 0, 0, 0.0001, 0.02, 1.3)
+    ddpJitter = call(pointProcess, "Get jitter (ddp)", 0, 0, 0.0001, 0.02, 1.3)
+    localShimmer = call([sound, pointProcess], "Get shimmer (local)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
+    localdbShimmer = call([sound, pointProcess], "Get shimmer (local_dB)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
+    apq3Shimmer = call([sound, pointProcess], "Get shimmer (apq3)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
+    aqpq5Shimmer = call([sound, pointProcess], "Get shimmer (apq5)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
+    apq11Shimmer = call([sound, pointProcess], "Get shimmer (apq11)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
+    ddaShimmer = call([sound, pointProcess], "Get shimmer (dda)", 0, 0, 0.0001, 0.02, 1.3, 1.6)
+
+    jit_shim_measures = np.hstack((localJitter, localabsoluteJitter, rapJitter, ppq5Jitter, ddpJitter,
+                                   localShimmer, localdbShimmer, apq3Shimmer, aqpq5Shimmer, apq11Shimmer, ddaShimmer))
+    return jit_shim_measures.reshape(1, -1)
+
+
+def measureFormants(sound, f0min, f0max):
+    pointProcess = call(sound, "To PointProcess (periodic, cc)", f0min, f0max)
+    formants = call(sound, "To Formant (burg)", 0.0025, 5, 5000, 0.025, 50)
+    numPoints = call(pointProcess, "Get number of points")
+
+    f1_list = []
+    f2_list = []
+    f3_list = []
+
+    # Measure formants only at glottal pulses
+    for point in range(0, numPoints):
+        point += 1
+        t = call(pointProcess, "Get time from index", point)
+        f1 = call(formants, "Get value at time", 1, t, 'Hertz', 'Linear')
+        f2 = call(formants, "Get value at time", 2, t, 'Hertz', 'Linear')
+        f3 = call(formants, "Get value at time", 3, t, 'Hertz', 'Linear')
+        f1_list.append(f1)
+        f2_list.append(f2)
+        f3_list.append(f3)
+
+    f1_mean = np.array([f1 for f1 in f1_list if str(f1) != 'nan']).mean()
+    f2_mean = np.array([f2 for f2 in f2_list if str(f2) != 'nan']).mean()
+    f3_mean = np.array([f3 for f3 in f3_list if str(f3) != 'nan']).mean()
+
+    formants_mean = np.hstack((f1_mean, f2_mean, f3_mean)).reshape(1, -1)
+    return formants_mean
+
+
+def get_mfcc(x, static):
+    mfcc = librosa.feature.mfcc(y=x, sr=sr, n_mfcc=13, n_fft=frame_size,
                                 hop_length=frame_step)
     mfccd = librosa.feature.delta(data=mfcc, order=1)
     mfccdd = librosa.feature.delta(data=mfcc, order=2)
     mfcc_matrix = np.vstack((mfcc, mfccd, mfccdd))
-    return mfcc_matrix.T
-
-
-def get_mel_features(path_to_file, static):
-    sr = 16000
-    x, _ = librosa.core.load(path_to_file, sr=sr)
-    x = x[len(x) % frame_size:]
-
-    # MFCC training data
-    mfcc = get_mfcc(x, sample_rate=sr)
+    mfcc = mfcc_matrix.T
     if static:
         mean_mfcc = np.mean(mfcc, axis=0)
         std_mfcc = np.std(mfcc, axis=0)
         skew_mfcc = scipy.stats.skew(mfcc, axis=0)
         kurt_mfcc = scipy.stats.kurtosis(mfcc, axis=0)
-        mfcc = np.hstack((mean_mfcc, std_mfcc, skew_mfcc, kurt_mfcc)).reshape((1,-1))
-
+        mfcc = np.hstack((mean_mfcc, std_mfcc, skew_mfcc, kurt_mfcc)).reshape((1, -1))
     return mfcc
 
 
-def get_prosodic_features(path_to_file):
-    # Prosodic features
+def get_prosodic_features(path_to_file, static_or_dynamic):
     prosody = Prosody()
-    prosodic_features = prosody.extract_features_file(path_to_file, static=False, plots=False, fmt="npy")
-    prosodic_features = prosodic_features.reshape(1, -1)
+    prosodic_features = prosody.extract_features_file(path_to_file, static=static_or_dynamic, plots=False, fmt="npy")
+    prosodic_features = prosodic_features[:13].reshape(1, -1)
     return prosodic_features
 
 
 def get_phonation_features(path_to_file, static_or_dynamic):
-    # Phonation features
     phon = Phonation()
     phonation_features = phon.extract_features_file(path_to_file, static=static_or_dynamic, plots=False, fmt="npy")
-    print("phon",static_or_dynamic, np.shape(phonation_features))
     return phonation_features
 
 
 def get_features(path_to_file, static_or_dynamic):
-    get_phonation_features(path_to_file, static_or_dynamic)
-    return get_mel_features(path_to_file, static_or_dynamic)
-    # return get_phonation_features(path_to_file, static_or_dynamic)
+    sr = 16000
+    x, _ = librosa.core.load(path_to_file, sr=sr)
+    mfcc_feats = get_mfcc(x, static_or_dynamic)
+
+    sound = parselmouth.Sound(path_to_file)
+    f0_feats = get_f0(sound, static_or_dynamic)
+    formants = measureFormants(sound, fmin, fmax)
+    jitter_shimmer = measurePitch(sound, fmin, fmax)
+
+    print(mfcc_feats.shape, f0_feats.shape, formants.shape, jitter_shimmer.shape)
+
+    # [156, 6, 3, 5, 6]
+    ifm_feats = np.hstack((mfcc_feats, f0_feats, formants, jitter_shimmer))
+    return ifm_feats

@@ -14,7 +14,6 @@ recreate_features = config.getboolean('RUN_SETTINGS', 'recreate_features')
 run_models = config.getboolean('RUN_SETTINGS', 'run_models')
 run_tl_models = config.getboolean('RUN_SETTINGS', 'run_tl_models')
 
-
 plot_results = config.getboolean('OUTPUT_SETTINGS', 'plot_results')
 
 if ifm_or_nifm == 'ifm':
@@ -24,8 +23,9 @@ if recreate_features:
     import get_features
     print("Creating {} features for '{}' dataset ".format(ifm_or_nifm, base_dataset))
     get_features.create_features(base_dataset, ifm_or_nifm)
-    print("Creating {} features for '{}' dataset ".format(ifm_or_nifm, target_dataset))
-    get_features.create_features(target_dataset, ifm_or_nifm)
+    if not target_dataset == 'pass':
+        print("Creating {} features for '{}' dataset ".format(ifm_or_nifm, target_dataset))
+        get_features.create_features(target_dataset, ifm_or_nifm)
 
 if run_models:
     print("Now running the {} ML model for '{}' dataset ".format(ifm_or_nifm, base_dataset))
@@ -42,5 +42,6 @@ if run_tl_models:
     ML_TL_model.run_experiment(base_dataset, target_dataset, ifm_or_nifm)
 
 if plot_results:
-    from plotting import results_visualised
-    results_visualised.plot_TL_performance(base_dataset, target_dataset)
+    if not target_dataset == 'pass':
+        from plotting import results_visualised
+        results_visualised.plot_TL_performance(base_dataset, target_dataset)

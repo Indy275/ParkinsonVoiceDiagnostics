@@ -2,11 +2,31 @@ import os.path
 
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import StandardScaler
 
 import get_ifm_features
 import get_nifm_features
 from data_util.data_util import make_train_test_split
 from data_util.file_util import load_files, get_dirs
+
+
+def scale_features(df, X):
+    # Scale the train and test data, fit to the train data
+    scaler = StandardScaler()
+    n_features = X.shape[1]
+
+    train_indices = df['train_test'] == 'True'
+    test_indices = df['train_test'] == 'False'
+
+    X_train = df.loc[train_indices, df.columns[:n_features]]
+    X_test = df.loc[test_indices, df.columns[:n_features]]
+
+    X_train_scaled = scaler.fit_transform(X_train)
+    X_test_scaled = scaler.transform(X_test)
+
+    df.loc[train_indices, df.columns[:n_features]] = X_train_scaled
+    df.loc[test_indices, df.columns[:n_features]] = X_test_scaled
+    return df
 
 
 def create_features(dataset, ifm_nifm):
@@ -20,8 +40,8 @@ def create_features(dataset, ifm_nifm):
     print("Found {} speakers, of which {} PD and {} HC.".format(len(HC_id_list) + len(PD_id_list), len(PD_id_list),
                                                                 len(HC_id_list)))
 
-    print("The train set consists of {} PD and {} HC speakers.".format(len(PD_train), len(HC_train)))
-    print("The test set consists of {} PD and {} HC speakers.".format(len(PD_test), len(HC_test)))
+    print("Created a train set containing {} PD and {} HC speakers.".format(len(PD_train), len(HC_train)))
+    print("Created a test set containing {} PD and {} HC speakers.".format(len(PD_test), len(HC_test)))
 
     X, y, subj_id, sample_id, train_data = [], [], [], [], []
     id_count = 0
@@ -57,21 +77,15 @@ def create_features(dataset, ifm_nifm):
     subj_id = np.array(subj_id).reshape(-1, 1)
     sample_id = np.array(sample_id).reshape(-1, 1)
     train_data = np.array(train_data).reshape(-1, 1)
-
     data = np.hstack((X, y, subj_id, sample_id, train_data))
     df = pd.DataFrame(data=data, columns=list(range(X.shape[1])) + ['y', 'subject_id', 'sample_id', 'train_test'])
+    df = scale_features(df, X)
 
-    print("Of the {} files, {} are from PD patients and {} are from HC".format(len(y),
-                                                                               len([i for i in y if
-                                                                                    i == 1]),
-                                                                               len([i for i in y if
-                                                                                    i == 0])))
-    print(X.shape, y.shape, subj_id.shape, sample_id.shape, train_data.shape)
-
-    np.save(store_location + 'X_{}.npy'.format(ifm_nifm), X)
-    np.save(store_location + 'y_{}.npy'.format(ifm_nifm), y)
-    np.save(store_location + 'subj_id_{}.npy'.format(ifm_nifm), subj_id)
-    np.save(store_location + 'sample_id_{}.npy'.format(ifm_nifm), sample_id)
-    np.save(store_location + 'train_data_{}.npy'.format(ifm_nifm), train_data)
+    print("Identified {} files, of which {} from PWP and {} from HC.".format(len(y),
+                                                                             len([i for i in y if
+                                                                                  i == 1]),
+                                                                             len([i for i in y if
+                                                                                  i == 0])))
 
     df.to_csv(store_location + "data_{}.csv".format(ifm_nifm), index=False)
+    print('Data with shape {} saved to {}.'.format(X.shape, store_location))
