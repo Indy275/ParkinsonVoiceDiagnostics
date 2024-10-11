@@ -3,8 +3,7 @@ import re
 import configparser
 
 config = configparser.ConfigParser()
-parent = os.path.dirname
-config.read(os.path.join(parent(parent(__file__)), 'settings.ini'))
+config.read('settings.ini')
 data_dir = config['DATA_SETTINGS']['data_dir']
 speech_task = config['DATA_SETTINGS']['speech_task']
 
@@ -12,23 +11,23 @@ speech_task = config['DATA_SETTINGS']['speech_task']
 def get_dirs(dataset):
     if dataset.lower().startswith('neurovoz'):
         folder = 'NeuroVoz'
-        dir = data_dir + folder + '\\audios_A\\'
+        dir = os.path.join(data_dir , folder, 'audios_A')
     elif dataset.lower() == 'czechpd':
         folder = 'CzechPD'
-        dir = data_dir + folder + "\\modified_records\\"
+        dir = os.path.join(data_dir , folder, 'modified_records')
     elif dataset.lower().startswith('italianpd'):
         folder = 'ItalianPD'
-        dir = data_dir + folder + "\\records\\"
+        dir = os.path.join(data_dir , folder, 'records')
     elif dataset.lower() == 'test':
         folder = 'test'
-        dir = data_dir + "\\NeuroVoz\\subsample\\"
+        dir = os.path.join(data_dir , 'NeuroVoz', 'subsample')
     else:
         print(" '{}' is not a valid data set ".format(dataset))
         return
     if speech_task == 'tdu':
-        dir = data_dir + folder + '\\records_tdu\\'
-        folder = folder + 'tdu'
-    store_location = data_dir + 'preprocessed_data\\{}_preprocessed\\'.format(folder)
+        dir = os.path.join(data_dir , folder, 'records_tdu')
+        folder = os.path.join(folder, 'tdu')
+    store_location = os.path.join(data_dir, 'preprocessed_data',f'{folder}_preprocessed')
 
     if not os.path.exists(store_location):
         os.makedirs(store_location)

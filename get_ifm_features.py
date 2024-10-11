@@ -10,8 +10,8 @@ from parselmouth.praat import call
 sr = 16000  # Sampling rate
 frame_size = int(0.04 * sr)  # Number of samples per frame
 frame_step = int(0.02 * sr)  # Number of samples between successive frames
-fmin = 20  # Min frequency to use in Mel spectrogram
-fmax = sr // 2  # Max frequency
+fmin = 75  # Min frequency to use in Mel spectrogram
+fmax = 300  # Max frequency
 
 
 def normalize(x):
@@ -34,26 +34,16 @@ def get_f0(sound, static):
     meanF0 = call(pitch, "Get mean", 0, 0, 'Hertz')
     stdevF0 = call(pitch, "Get standard deviation", 0, 0, 'Hertz')
     minF0 = call(pitch, "Get minimum", 0, 0, 'Hertz', 'parabolic')
+    minF0 = np.nan_to_num(minF0)
     maxF0 = call(pitch, "Get maximum", 0, 0, 'Hertz', 'parabolic')
 
     pitch_values = pitch.selected_array['frequency']
     df0 = np.diff(pitch_values, 1)
     ddf0 = np.diff(df0, 1)
-    
+
     meandF0 = df0.mean()
     meanddF0 = ddf0.mean()
     measuresF0 = np.hstack((meanF0, stdevF0, minF0, maxF0, meandF0, meanddF0)).reshape((1, -1))
-    # f0, _, _ = librosa.pyin(sound, fmin=fmin, fmax=fmax, sr=sr, frame_length=frame_size, hop_length=frame_step)
-    # if static:
-    #     f0 = f0[f0 != 0]
-    #     df0 = np.diff(f0, 1)
-    #     ddf0 = np.diff(df0, 1)
-    #     df0_mean = np.mean(df0)
-    #     ddf0_mean = np.mean(ddf0)
-    #     f0_mean, f0_std, f0_skew, f0_kurt = np.mean(f0), np.std(f0), scipy.stats.skew(f0), scipy.stats.kurtosis(f0)
-    #     f0_max, f0_min = np.max(f0), np.min(f0)
-    #     f0_measures = np.hstack((df0_mean, ddf0_mean, f0_mean, f0_std, f0_skew, f0_kurt, f0_max, f0_min))
-    #     return f0_measures.reshape((1, -1))
     return measuresF0
 
 
@@ -84,7 +74,6 @@ def measureFormants(sound, f0min, f0max):
     f1_list = []
     f2_list = []
     f3_list = []
-
     # Measure formants only at glottal pulses
     for point in range(0, numPoints):
         point += 1
@@ -133,18 +122,19 @@ def get_phonation_features(path_to_file, static_or_dynamic):
     return phonation_features
 
 
-def get_features(path_to_file, static_or_dynamic):
+def get_features(path_to_file, ifm_nifm):
+    if ifm_nifm[-4:] == 'file':
+        static_or_dynamic = True
+    elif ifm_nifm[-6:] == 'window':
+        static_or_dynamic = False
     sr = 16000
     x, _ = librosa.core.load(path_to_file, sr=sr)
     mfcc_feats = get_mfcc(x, static_or_dynamic)
-
     sound = parselmouth.Sound(path_to_file)
     f0_feats = get_f0(sound, static_or_dynamic)
     formants = measureFormants(sound, fmin, fmax)
     jitter_shimmer = measurePitch(sound, fmin, fmax)
 
-    print(mfcc_feats.shape, f0_feats.shape, formants.shape, jitter_shimmer.shape)
-
-    # [156, 6, 3, 5, 6]
-    ifm_feats = np.hstack((mfcc_feats, f0_feats, formants, jitter_shimmer))
+    # [6, 5, 6, 3, 156]
+    ifm_feats = np.hstack((f0_feats, jitter_shimmer, formants, mfcc_feats))
     return ifm_feats

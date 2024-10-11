@@ -7,8 +7,7 @@ from scipy.io import wavfile
 from scipy.signal import resample
 
 config = configparser.ConfigParser()
-parent = os.path.dirname
-config.read(os.path.join(parent(parent(__file__)), 'settings.ini'))
+config.read('settings.ini')
 data_dir = config['DATA_SETTINGS']['data_dir']
 
 
