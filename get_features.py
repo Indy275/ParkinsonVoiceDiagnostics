@@ -115,28 +115,5 @@ def create_features(dataset, ifm_nifm):
         if id == len(files)-1:
             save_intermediate_results(X, y, subj_id, sample_id, gender, train_data, ifm_nifm, store_location, id)
 
-    X = np.vstack(X)
-    y = np.array(y).reshape(-1, 1)
-    subj_id = np.array(subj_id).reshape(-1, 1)
-    sample_id = np.array(sample_id).reshape(-1, 1)
-    gender = np.array(gender).reshape(-1, 1)
-    train_data = np.array(train_data).reshape(-1, 1)
-
-    data = np.hstack((X, y, subj_id, sample_id, gender, train_data))
-    df = pd.DataFrame(data=data, columns=list(range(X.shape[1])) + ['y', 'subject_id', 'sample_id', 'gender', 'train_test'])
-    
-    df = scale_features(df, X)
-    if ifm_nifm.startswith('nifm'):
-        df = get_nifm_features.reduce_dims(df, X.shape[1])
-
-
-    print("Identified {} files, of which {} from PWP and {} from HC.".format(len(y),
-                                                                             len([i for i in y if
-                                                                                  i == 1]),
-                                                                             len([i for i in y if
-                                                                                  i == 0])))
-
-    df.to_csv(os.path.join(store_location, f"data_{ifm_nifm}.csv"), index=False)
-
     combine_dfs(store_location, ifm_nifm)
     print(f'Data saved to {store_location}.')

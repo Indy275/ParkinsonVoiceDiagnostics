@@ -15,12 +15,6 @@ pd.options.mode.chained_assignment = None  # default='warn'
 
 
 def run_data_fold(model, df, n_features, train_indices, test_indices):
-    cwd = os.path.abspath(os.getcwd())
-    experiment_folder = os.path.join(cwd,'experiments')
-    print(experiment_folder)
-    if not os.path.exists(experiment_folder):
-        os.makedirs(experiment_folder)
-
     X_train = df.loc[train_indices, df.columns[:n_features]]
     X_test = df.loc[test_indices, df.columns[:n_features]]
     y_train = df.loc[train_indices, 'y']
@@ -44,7 +38,14 @@ def run_data_fold(model, df, n_features, train_indices, test_indices):
 
 
 def run(dataset, ifm_nifm, model, k=1):
+    cwd = os.path.abspath(os.getcwd())
+    experiment_folder = os.path.join(cwd,'experiments')
+    if not os.path.exists(experiment_folder):
+        os.makedirs(experiment_folder)
+
     df, n_features = load_data(dataset, ifm_nifm)
+    print("Data shape:", df.shape)
+
     fscores, sscores = [], []
     if k == 1:
         df['train_test'] = df['train_test'].astype(bool)
@@ -54,7 +55,8 @@ def run(dataset, ifm_nifm, model, k=1):
         fscores.append(fscore)
         sscores.append(sscore)
     else:
-        for _ in range(k):
+        for i in range(k):
+            print(f"Running {model} with data fold {i} of {k}")
             split_df = df.drop_duplicates(['subject_id'])
             split_df.loc[:,'ygender'] = split_df['y'].astype(str) + '_' + split_df['gender'].astype(str)
             train_subjects, test_subjects = train_test_split(split_df['subject_id'], shuffle=True, stratify=split_df['ygender'])

@@ -100,12 +100,15 @@ def get_mfcc(x, static):
     mfccdd = librosa.feature.delta(data=mfcc, order=2)
     mfcc_matrix = np.vstack((mfcc, mfccd, mfccdd))
     mfcc = mfcc_matrix.T
+    print("mfcc shape",mfcc_matrix.shape)
     if static:
         mean_mfcc = np.mean(mfcc, axis=0)
         std_mfcc = np.std(mfcc, axis=0)
         skew_mfcc = scipy.stats.skew(mfcc, axis=0)
         kurt_mfcc = scipy.stats.kurtosis(mfcc, axis=0)
+        print(mean_mfcc.shape, std_mfcc.shape, skew_mfcc.shape)
         mfcc = np.hstack((mean_mfcc, std_mfcc, skew_mfcc, kurt_mfcc)).reshape((1, -1))
+        print("mfccstatic shape", mfcc.shape)
     return mfcc
 
 

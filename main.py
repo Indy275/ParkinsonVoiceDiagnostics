@@ -35,7 +35,7 @@ if recreate_features:
         get_features.create_features(target_dataset, ifm_or_nifm)
 
 if run_models:
-    print("Now running the {} {} model for '{}' dataset ".format(ifm_or_nifm, clf, base_dataset))
+    print("Now running the {} for '{}' dataset with {} features ".format(clf, base_dataset, ifm_or_nifm))
     import run_experiments
     run_experiments.run(base_dataset, ifm_or_nifm, model=clf ,k=kfolds)
 
