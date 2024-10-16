@@ -2,8 +2,6 @@ import numpy as np
 import librosa
 import scipy.stats
 
-from disvoice.prosody import Prosody
-from disvoice.phonation import Phonation
 import parselmouth
 from parselmouth.praat import call
 
@@ -99,20 +97,25 @@ def get_mfcc(x, static):
     mfccd = librosa.feature.delta(data=mfcc, order=1)
     mfccdd = librosa.feature.delta(data=mfcc, order=2)
     mfcc_matrix = np.vstack((mfcc, mfccd, mfccdd))
+
     mfcc = mfcc_matrix.T
-    print("mfcc shape",mfcc_matrix.shape)
+    
+    # print("mfcc shape",mfcc_matrix.shape)
     if static:
         mean_mfcc = np.mean(mfcc, axis=0)
         std_mfcc = np.std(mfcc, axis=0)
         skew_mfcc = scipy.stats.skew(mfcc, axis=0)
         kurt_mfcc = scipy.stats.kurtosis(mfcc, axis=0)
-        print(mean_mfcc.shape, std_mfcc.shape, skew_mfcc.shape)
+        # print(mean_mfcc.shape, std_mfcc.shape, skew_mfcc.shape)
         mfcc = np.hstack((mean_mfcc, std_mfcc, skew_mfcc, kurt_mfcc)).reshape((1, -1))
-        print("mfccstatic shape", mfcc.shape)
+        # print(mean_mfcc)
+        # print("mfccstatic shape", mfcc.shape)
     return mfcc
 
 
 def get_prosodic_features(path_to_file, static_or_dynamic):
+    from disvoice.prosody import Prosody
+
     prosody = Prosody()
     prosodic_features = prosody.extract_features_file(path_to_file, static=static_or_dynamic, plots=False, fmt="npy")
     prosodic_features = prosodic_features[:13].reshape(1, -1)
@@ -120,6 +123,7 @@ def get_prosodic_features(path_to_file, static_or_dynamic):
 
 
 def get_phonation_features(path_to_file, static_or_dynamic):
+    from disvoice.phonation import Phonation
     phon = Phonation()
     phonation_features = phon.extract_features_file(path_to_file, static=static_or_dynamic, plots=False, fmt="npy")
     return phonation_features
@@ -132,8 +136,9 @@ def get_features(path_to_file, ifm_nifm):
         static_or_dynamic = False
     sr = 16000
     x, _ = librosa.core.load(path_to_file, sr=sr)
-    mfcc_feats = get_mfcc(x, static_or_dynamic)
     sound = parselmouth.Sound(path_to_file)
+
+    mfcc_feats = get_mfcc(x, static_or_dynamic)
     f0_feats = get_f0(sound, static_or_dynamic)
     formants = measureFormants(sound, fmin, fmax)
     jitter_shimmer = measurePitch(sound, fmin, fmax)

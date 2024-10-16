@@ -37,7 +37,7 @@ if recreate_features:
 if run_models:
     print("Now running the {} for '{}' dataset with {} features ".format(clf, base_dataset, ifm_or_nifm))
     import run_experiments
-    run_experiments.run(base_dataset, ifm_or_nifm, model=clf ,k=kfolds)
+    run_experiments.run(base_dataset, ifm_or_nifm, model=clf, k=kfolds)
 
 if run_tl_models:
     import ML_TL_model

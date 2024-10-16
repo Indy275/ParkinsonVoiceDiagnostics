@@ -1,10 +1,11 @@
 import numpy as np
 import configparser
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
 import pandas as pd
 import os
+from copy import deepcopy
 
-from data_util import load_data
+from data_util import load_data, scale_features
 from DNN_models import run_dnn_model
 from ML_models import run_ml_model
 
@@ -12,6 +13,11 @@ config = configparser.ConfigParser()
 config.read('settings.ini')
 print_intermediate = config.getboolean('OUTPUT_SETTINGS', 'print_intermediate')
 pd.options.mode.chained_assignment = None  # default='warn'
+
+cwd = os.path.abspath(os.getcwd())
+experiment_folder = os.path.join(cwd,'experiments')
+if not os.path.exists(experiment_folder):
+    os.makedirs(experiment_folder)
 
 
 def run_data_fold(model, df, n_features, train_indices, test_indices):
@@ -38,35 +44,34 @@ def run_data_fold(model, df, n_features, train_indices, test_indices):
 
 
 def run(dataset, ifm_nifm, model, k=1):
-    cwd = os.path.abspath(os.getcwd())
-    experiment_folder = os.path.join(cwd,'experiments')
-    if not os.path.exists(experiment_folder):
-        os.makedirs(experiment_folder)
-
     df, n_features = load_data(dataset, ifm_nifm)
     print("Data shape:", df.shape)
 
     fscores, sscores = [], []
-    if k == 1:
-        df['train_test'] = df['train_test'].astype(bool)
-        train_indices = df['train_test']
-        test_indices = ~df['train_test']
+    split_df = df.drop_duplicates(['subject_id'])
+    split_df.loc[:,'ygender'] = split_df['y'].astype(str) + '_'# + split_df['gender'].astype(str)
+    print(split_df['ygender'].value_counts())
+
+    kf = StratifiedKFold(n_splits=k, shuffle=True)
+    
+    for i, (train_split_indices, test_split_indices) in enumerate(kf.split(split_df['subject_id'], split_df['ygender'])):
+        print(f"Running {model} with data fold {i} of {k}")
+        df = deepcopy(df)
+
+        # Crazy hack needed because split() function stupidity... only works if sample_id is unique
+        trainsamples = split_df.iloc[train_split_indices]['sample_id']
+        testsamples = split_df.iloc[test_split_indices]['sample_id']
+        train_indices = df[df['sample_id'].isin(trainsamples)].index.tolist()
+        test_indices = df[df['sample_id'].isin(testsamples)].index.tolist()
+
+        print(train_split_indices, test_split_indices)
+        print(df.iloc[test_split_indices])
+    
+        df = scale_features(df, n_features, train_indices, test_indices)
+
         fscore, sscore = run_data_fold(model, df, n_features, train_indices, test_indices)
         fscores.append(fscore)
         sscores.append(sscore)
-    else:
-        for i in range(k):
-            print(f"Running {model} with data fold {i} of {k}")
-            split_df = df.drop_duplicates(['subject_id'])
-            split_df.loc[:,'ygender'] = split_df['y'].astype(str) + '_' + split_df['gender'].astype(str)
-            train_subjects, test_subjects = train_test_split(split_df['subject_id'], shuffle=True, stratify=split_df['ygender'])
-
-            train_indices = df.index[df['subject_id'].isin(train_subjects)].tolist()
-            test_indices = df.index[df['subject_id'].isin(test_subjects)].tolist()
-
-            fscore, sscore = run_data_fold(model, df, n_features, train_indices, test_indices)
-            fscores.append(fscore)
-            sscores.append(sscore)
 
     print("File-level performance:")
     print("Mean Acc:", round(sum(i[0] for i in fscores)/k, 3))

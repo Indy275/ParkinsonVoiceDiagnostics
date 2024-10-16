@@ -26,7 +26,7 @@ def get_dirs(dataset):
         return
     if speech_task == 'tdu':
         dir = os.path.join(data_dir , folder, 'records_tdu')
-        folder = os.path.join(folder, 'tdu')
+        folder = folder + 'tdu'
     store_location = os.path.join(data_dir, 'preprocessed_data',f'{folder}_preprocessed')
 
     if not os.path.exists(store_location):
