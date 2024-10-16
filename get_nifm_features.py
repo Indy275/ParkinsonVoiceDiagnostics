@@ -13,10 +13,11 @@ def get_features(path_to_file):
     input_values = processor(x, return_tensors="pt", sampling_rate=sr).input_values
     with torch.no_grad():
         hidden_states = model(input_values).last_hidden_state
-    return hidden_states.detach().numpy()
+    embedding = hidden_states.detach().numpy()
+    return embedding
 
 
-def reduce_dims(df, n_features , n_components=150):
+def reduce_dims(df, n_features, n_components=150):
     pca = PCA(n_components=n_components)
     pca.fit(df.iloc[:, :n_features])
     transformed_feats = pca.transform(df.iloc[:, :n_features])
@@ -26,7 +27,6 @@ def reduce_dims(df, n_features , n_components=150):
     df2['subject_id'] = df['subject_id']
     df2['sample_id'] = df['sample_id']
     df2['gender'] = df['gender']
-    df2['train_test'] = df['train_test']
 
     # plt.plot(list(range(n_components)), pca.explained_variance_ratio_.cumsum())
     # # plt.vlines(150, 0, 1 , colors='red', linestyles='dashed')
@@ -39,3 +39,9 @@ def reduce_dims(df, n_features , n_components=150):
     print(f"Explained variance with {n_components} components:", pca.explained_variance_ratio_.cumsum()[150-1])
 
     return df2
+
+def aggregate_windows(df):
+    feature_cols = df.columns[:-5]
+    df[feature_cols] = df.groupby('subject_id')[feature_cols].transform('mean')
+    df = df.drop_duplicates(subset=['subject_id'])
+    return df
