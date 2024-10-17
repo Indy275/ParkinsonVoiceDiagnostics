@@ -101,7 +101,7 @@ def run_ml_tl_model(base_X_train, base_X_test, base_y_train, base_y_test, tgt_df
         tgt_test_df = tgt_df[~tgt_df['subject_id'].isin(pos_train_samples + neg_train_samples)]
 
         if n_shots > 0:
-            # Train model with these additional samples
+            # Train model with a mix of base and target samples
             tgt_X_train = tgt_train_df.iloc[:, :n_features]
             tgt_y_train = tgt_train_df['y']
             train_model(clf_copy, tgt_X_train, tgt_y_train)
