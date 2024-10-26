@@ -16,8 +16,8 @@ def save_intermediate_results(X, y, subj_id, sample_id, gender, ifm_nifm, store_
     data = np.hstack((X, y, subj_id, sample_id, gender))
     df = pd.DataFrame(data=data, columns=list(range(X.shape[1])) + ['y', 'subject_id', 'sample_id', 'gender'])
 
-    df.to_csv(os.path.join(store_location, f"data_{ifm_nifm}_{id}.csv"), index=False)
-    print(f'Data saved to {store_location}.')
+    df.to_csv(os.path.join(store_location[0], f"{store_location[1]}_{ifm_nifm}_{id}.csv"), index=False)
+    print(f'Intermediate data saved to {store_location[0]}.')
 
 def combine_dfs(store_location, ifm_nifm):
     """
@@ -25,9 +25,9 @@ def combine_dfs(store_location, ifm_nifm):
     """
 
     partial_dfs = []
-    for file in os.listdir(store_location):
-        path_to_file = os.path.join(store_location, file)
-        if file.startswith(f'data_{ifm_nifm}_'):
+    for file in os.listdir(store_location[0]):
+        path_to_file = os.path.join(store_location[0], file)
+        if file.startswith(f'{store_location[1]}_{ifm_nifm}_'):
             partial_df = pd.read_csv(path_to_file)
             partial_dfs.append(partial_df)
             os.remove(path_to_file)
@@ -45,7 +45,8 @@ def combine_dfs(store_location, ifm_nifm):
         df = get_nifm_features.reduce_dims(df, len(df.columns)-5)
         df = get_nifm_features.aggregate_windows(df)
 
-    df.to_csv(os.path.join(store_location, f"data_{ifm_nifm}.csv"), index=False)
+    df.to_csv(os.path.join(store_location[0], f"{store_location[1]}_{ifm_nifm}.csv"), index=False)
+
 
 
 def create_features(dataset, ifm_nifm):
@@ -66,11 +67,10 @@ def create_features(dataset, ifm_nifm):
 
         if ifm_nifm.startswith('ifm'):
             import get_ifm_features
-            features = get_ifm_features.get_features(path_to_file, ifm_nifm)
+            features = get_ifm_features.get_features(path_to_file)
         elif ifm_nifm.startswith('nifm'):
             import get_nifm_features
             features = get_nifm_features.get_features(path_to_file)
-            features = np.squeeze(features)
     
         X.extend(features)
         y.extend([1 if file[:2] == 'PD' else 0] * features.shape[0])

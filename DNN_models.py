@@ -1,5 +1,6 @@
 import random
 import numpy as np
+from copy import deepcopy
 import configparser
 
 import torch
@@ -41,15 +42,12 @@ class DNNModel(nn.Module):
         x = self.dropout2(x)
 
         x = self.fc3(x)
+        x = torch.sigmoid(x)
 
         return x
 
 
-def train_model(model, optimizer, criterion, X_train, y_train, num_epochs=10):
-    batch_size = 8
-    train_dataset = TensorDataset(X_train, y_train)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-
+def train_model(model, optimizer, criterion, train_loader, num_epochs=10):
     for epoch in range(num_epochs):
         model.train()
         
@@ -71,7 +69,7 @@ def create_dnn_model(n_features):
     return model, optimizer, criterion
 
 
-def run_dnn_model(X_train, X_test, y_train, y_test, df, test_indices):
+def run_dnn_model(X_train, X_test, y_train, y_test, test_df):
     n_features = X_train.shape[1]
 
     X_train = torch.tensor(X_train.values).to(torch.float32)
@@ -80,25 +78,24 @@ def run_dnn_model(X_train, X_test, y_train, y_test, df, test_indices):
     y_test = y_test.values
     model, optimizer, criterion = create_dnn_model(n_features)
 
-    train_model(model, optimizer, criterion, X_train, y_train)
+    train_dataset = TensorDataset(X_train, y_train)
+    train_loader = DataLoader(train_dataset, batch_size=5, shuffle=True)
+
+    train_model(model, optimizer, criterion, train_loader)
 
     model.eval()
     with torch.no_grad():
         predictions = model(X_test)
         _, predicted = torch.max(predictions.data, 1)
-    df.loc[test_indices, 'preds'] = predicted.numpy()
+    test_df['preds'] = predicted.numpy()
 
-    file_scores = evaluate_predictions('DeepNN' + 'Window', y_test, df.loc[test_indices, 'preds'].tolist())
+    all_metrics = evaluate_predictions('DNN', y_test, test_df)
+    file_scores, subj_scores = zip(*all_metrics)
 
-    samples_preds = df.loc[test_indices, ['subject_id', 'preds']].groupby('subject_id').agg({'preds': lambda x: x.mode()[0]}).reset_index()
-    samples_ytest = df.loc[test_indices, ['subject_id', 'y']].groupby('subject_id').agg({'y': lambda x: x.mode()[0]}).reset_index()
-
-    subj_scores = evaluate_predictions('DeepNN'+'SubjID', samples_ytest['y'].tolist(), samples_preds['preds'].tolist())
-    
     return file_scores, subj_scores
 
 
-def train_tl_model(model, optimizer, criterion, base_loader, target_loader, num_epochs=3):
+def train_tl_batch_model(model, optimizer, criterion, base_loader, target_loader, num_epochs=10):
     target_iter = iter(target_loader) if target_loader else None
 
     for epoch in range(num_epochs):
@@ -127,11 +124,27 @@ def train_tl_model(model, optimizer, criterion, base_loader, target_loader, num_
             loss = criterion(outputs, batch_y)  # Compute the loss
             loss.backward()  # Compute gradients
             optimizer.step()  # Update model weights
+
         if print_intermediate:
             print(f'Epoch [{epoch+1}/{num_epochs}]: Loss: {loss.item():.4f}')
 
 
-def run_dnn_tl_model(base_X_train, base_X_test, base_y_train, base_y_test, tgt_df):
+def train_tl_model(model, optimizer, criterion, base_loader, target_loader=None, num_epochs=10):
+       for epoch in range(num_epochs):
+        model.train()
+        
+        for batch_data, batch_labels in base_loader:
+            optimizer.zero_grad()  # Reset gradients
+            outputs = model(batch_data)  # Get model predictions
+            loss = criterion(outputs, batch_labels)  # Compute the loss
+            loss.backward()  # Compute gradients
+            optimizer.step()  # Update model weights
+
+        if print_intermediate:
+            print(f'Epoch [{epoch+1}/{num_epochs}]: Loss: {loss.item():.4f}')
+
+
+def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, tgt_df):
     n_features = base_X_train.shape[1]
 
     base_X_train = torch.tensor(base_X_train.values).to(torch.float32)
@@ -141,19 +154,25 @@ def run_dnn_tl_model(base_X_train, base_X_test, base_y_train, base_y_test, tgt_d
     base_model, optimizer, criterion = create_dnn_model(n_features)
 
     base_dataset = TensorDataset(base_X_train, base_y_train)
-    base_loader = DataLoader(base_dataset, batch_size=5, shuffle=True)
+    base_loader = DataLoader(base_dataset)#, batch_size=5, shuffle=True)
 
     train_tl_model(base_model, optimizer, criterion, base_loader, target_loader=None)
 
     pos_subjs = list(tgt_df[tgt_df['y'] == 1]['subject_id'].unique())
     neg_subjs = list(tgt_df[tgt_df['y'] == 0]['subject_id'].unique())
     max_shot = min(len(pos_subjs), len(neg_subjs)) - 5
-
-    metrics_list, metrics_grouped, n_tgt_train_samples, base_metrics = [], [], [], []
+    # max_shot = 5
+    
+    metrics_list, metrics_grouped, base_metrics, n_tgt_train_samples = [], [], [], []
     seed = int(random.random()*10000)
-    for n_shots in range(max_shot):
-        model = type(base_model)(n_features)
+    for n_shots in range(max_shot+1):
+        # model = base_model
+        model = deepcopy(base_model)
+        # model = type(base_model)(n_features)
         model.load_state_dict(base_model.state_dict())
+        # model.fc2.weight.requires_grad = False
+        # model.fc2.bias.requires_grad = False
+        optimizer = optim.AdamW(model.parameters(), lr=0.001)
 
         random.seed(seed)
         pos_train_samples = random.sample(pos_subjs, n_shots)
@@ -167,16 +186,18 @@ def run_dnn_tl_model(base_X_train, base_X_test, base_y_train, base_y_test, tgt_d
             # Train model with these additional samples
             tgt_X_train = tgt_train_df.iloc[:, :n_features]
             tgt_y_train = tgt_train_df['y']
-
-            tgt_X_train = torch.tensor(tgt_X_train.values).to(torch.float32)
+            tgt_X_train = scaler.transform(tgt_X_train.values)  # Uncertain if this is correct way
+            tgt_X_train = torch.tensor(tgt_X_train).to(torch.float32)
             tgt_y_train = torch.tensor(tgt_y_train.values)
 
             tgt_dataset = TensorDataset(tgt_X_train, tgt_y_train)
-            tgt_loader = DataLoader(tgt_dataset, batch_size=5, shuffle=True)
+            tgt_loader = DataLoader(tgt_dataset)#, batch_size=5, shuffle=True)
 
-            train_tl_model(model, optimizer, criterion, base_loader, target_loader=tgt_loader)
+            train_tl_batch_model(model, optimizer, criterion, base_loader, tgt_loader)
+            # train_tl_model(model, optimizer, criterion, tgt_loader, num_epochs=5)
 
-        tgt_X_test = tgt_test_df.iloc[:, :n_features].values
+        tgt_X_test = tgt_test_df.iloc[:, :n_features]
+        tgt_X_test = scaler.transform(tgt_X_test.values)  
         tgt_X_test = torch.tensor(tgt_X_test).to(torch.float32)
         tgt_y_test = tgt_test_df['y']
 
@@ -186,20 +207,13 @@ def run_dnn_tl_model(base_X_train, base_X_test, base_y_train, base_y_test, tgt_d
             tgt_preds = model(tgt_X_test)
             _, base_predicted = torch.max(base_preds.data, 1)
             _, tgt_predicted = torch.max(tgt_preds.data, 1)
-
         tgt_test_df.loc[:, 'preds'] = tgt_predicted.numpy()
 
+        all_metrics = evaluate_predictions(f'DNN ({n_shots} shots)', tgt_y_test, tgt_test_df, base_y_test, base_predicted.numpy())
+        metrics, grouped, base = zip(*all_metrics)
+        metrics_list.append(metrics)
+        metrics_grouped.append(grouped)
+        base_metrics.append(base)
         n_tgt_train_samples.append(n_shots)
-        metrics_list.append(evaluate_predictions('DNN' + '0{}shot'.format(n_shots), tgt_y_test, tgt_predicted.numpy()))
-        base_metrics.append(evaluate_predictions('DNN' + ' BASEDF', base_y_test, base_predicted.numpy()))
-
-        samples_preds = tgt_test_df.groupby('sample_id').agg({'preds': lambda x: x.mode()[0]}).reset_index()
-        samples_ytest = tgt_test_df.groupby('sample_id').agg({'y': lambda x: x.mode()[0]}).reset_index()
-
-        metrics_grouped.append(
-            evaluate_predictions('DNN' + 'Sample', samples_ytest['y'].tolist(),
-                                    samples_preds['preds'].tolist()))
-    
-    # print("Metrics:\n", metrics_list, "\n grouped: \n", metrics_grouped, "\n base \n", base_metrics, "\n", n_tgt_train_samples)
-
+        
     return metrics_list, metrics_grouped, base_metrics, n_tgt_train_samples

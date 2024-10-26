@@ -19,11 +19,11 @@ config.read(os.path.join(parent(parent(__file__)), 'settings.ini'))
 data_dir = config['DATA_SETTINGS']['data_dir']
 
 dataset = 'NeuroVoz'  # NeuroVoz ItalianPD CzechPD test
-ifm_or_nifm = 'nifm'
-file_or_window = 'file'
+ifm_or_nifm = 'ifm'
+# file_or_window = 'file'
 
-if ifm_or_nifm == 'ifm':
-    ifm_or_nifm += '_{}'.format(file_or_window)
+# if ifm_or_nifm == 'ifm':
+#     ifm_or_nifm += '_{}'.format(file_or_window)
 
 df, n_features = load_data(dataset, ifm_or_nifm)
 df.rename(columns={'subject_id':'ID'}, inplace=True)

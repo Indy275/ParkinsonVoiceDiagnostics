@@ -27,12 +27,11 @@ def normalize(x):
     return (x - np.mean(x)) / (eps + np.std(x))
 
 
-def get_f0(sound, static):
+def get_f0(sound):
     pitch = call(sound, "To Pitch", 0.0, fmin, fmax)
     meanF0 = call(pitch, "Get mean", 0, 0, 'Hertz')
     stdevF0 = call(pitch, "Get standard deviation", 0, 0, 'Hertz')
     minF0 = call(pitch, "Get minimum", 0, 0, 'Hertz', 'parabolic')
-    minF0 = np.nan_to_num(minF0)
     maxF0 = call(pitch, "Get maximum", 0, 0, 'Hertz', 'parabolic')
 
     pitch_values = pitch.selected_array['frequency']
@@ -91,25 +90,20 @@ def measureFormants(sound, f0min, f0max):
     return formants_mean
 
 
-def get_mfcc(x, static):
+def get_mfcc(x):
     mfcc = librosa.feature.mfcc(y=x, sr=sr, n_mfcc=13, n_fft=frame_size,
                                 hop_length=frame_step)
     mfccd = librosa.feature.delta(data=mfcc, order=1)
     mfccdd = librosa.feature.delta(data=mfcc, order=2)
     mfcc_matrix = np.vstack((mfcc, mfccd, mfccdd))
-
     mfcc = mfcc_matrix.T
     
-    # print("mfcc shape",mfcc_matrix.shape)
-    if static:
-        mean_mfcc = np.mean(mfcc, axis=0)
-        std_mfcc = np.std(mfcc, axis=0)
-        skew_mfcc = scipy.stats.skew(mfcc, axis=0)
-        kurt_mfcc = scipy.stats.kurtosis(mfcc, axis=0)
-        # print(mean_mfcc.shape, std_mfcc.shape, skew_mfcc.shape)
-        mfcc = np.hstack((mean_mfcc, std_mfcc, skew_mfcc, kurt_mfcc)).reshape((1, -1))
-        # print(mean_mfcc)
-        # print("mfccstatic shape", mfcc.shape)
+    mean_mfcc = np.mean(mfcc, axis=0)
+    std_mfcc = np.std(mfcc, axis=0)
+    skew_mfcc = scipy.stats.skew(mfcc, axis=0)
+    kurt_mfcc = scipy.stats.kurtosis(mfcc, axis=0)
+
+    mfcc = np.hstack((mean_mfcc, std_mfcc, skew_mfcc, kurt_mfcc)).reshape((1, -1))
     return mfcc
 
 
@@ -129,20 +123,17 @@ def get_phonation_features(path_to_file, static_or_dynamic):
     return phonation_features
 
 
-def get_features(path_to_file, ifm_nifm):
-    if ifm_nifm[-4:] == 'file':
-        static_or_dynamic = True
-    elif ifm_nifm[-6:] == 'window':
-        static_or_dynamic = False
+def get_features(path_to_file):
     sr = 16000
     x, _ = librosa.core.load(path_to_file, sr=sr)
     sound = parselmouth.Sound(path_to_file)
-
-    mfcc_feats = get_mfcc(x, static_or_dynamic)
-    f0_feats = get_f0(sound, static_or_dynamic)
+    sound = sound.resample(sr)
+    f0_feats = get_f0(sound)
     formants = measureFormants(sound, fmin, fmax)
     jitter_shimmer = measurePitch(sound, fmin, fmax)
+    mfcc_feats = get_mfcc(x)
 
     # [6, 5, 6, 3, 156]
     ifm_feats = np.hstack((f0_feats, jitter_shimmer, formants, mfcc_feats))
+    ifm_feats = np.nan_to_num(ifm_feats)
     return ifm_feats

@@ -1,5 +1,6 @@
 import librosa
 import torch
+import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from transformers import AutoProcessor, HubertModel
@@ -14,7 +15,7 @@ def get_features(path_to_file):
     with torch.no_grad():
         hidden_states = model(input_values).last_hidden_state
     embedding = hidden_states.detach().numpy()
-    return embedding
+    return np.squeeze(embedding)
 
 
 def reduce_dims(df, n_features, n_components=150):
@@ -41,7 +42,14 @@ def reduce_dims(df, n_features, n_components=150):
     return df2
 
 def aggregate_windows(df):
-    feature_cols = df.columns[:-5]
+    feature_cols = df.columns[:-4]
     df[feature_cols] = df.groupby('subject_id')[feature_cols].transform('mean')
     df = df.drop_duplicates(subset=['subject_id'])
-    return df
+
+    aggregations = ['mean', 'std', 'skew', 'kurt']
+
+    aggregated_df = df.groupby('speaker_id').agg({col: aggregations for col in feature_cols})
+
+    aggregated_df.columns = ['_'.join(col).strip() for col in aggregated_df.columns.values]
+    print(aggregated_df.shape, aggregated_df.columns)
+    return aggregated_df

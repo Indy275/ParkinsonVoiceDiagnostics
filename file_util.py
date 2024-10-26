@@ -18,6 +18,9 @@ def get_dirs(dataset):
     elif dataset.lower().startswith('italianpd'):
         folder = 'ItalianPD'
         dir = os.path.join(data_dir , folder, 'records')
+    elif dataset.lower().startswith('pcgita'):
+        folder = 'PCGITA'
+        dir = os.path.join(data_dir , folder, 'records')
     elif dataset.lower() == 'test':
         folder = 'test'
         dir = os.path.join(data_dir , 'NeuroVoz', 'subsample')
@@ -27,10 +30,8 @@ def get_dirs(dataset):
     if speech_task == 'tdu':
         dir = os.path.join(data_dir , folder, 'records_tdu')
         folder = folder + 'tdu'
-    store_location = os.path.join(data_dir, 'preprocessed_data',f'{folder}_preprocessed')
+    store_location = (os.path.join(data_dir, 'preprocessed_data'), folder)
 
-    if not os.path.exists(store_location):
-        os.makedirs(store_location)
     return dir, store_location
 
 
