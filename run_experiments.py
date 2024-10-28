@@ -11,6 +11,8 @@ config = configparser.ConfigParser()
 config.read('settings.ini')
 print_intermediate = config.getboolean('OUTPUT_SETTINGS', 'print_intermediate')
 clf = config['MODEL_SETTINGS']['clf']
+gender = config.getint('EXPERIMENT_SETTINGS', 'gender')
+
 
 pd.options.mode.chained_assignment = None  # default='warn'
 if clf == 'DNN':
@@ -37,6 +39,10 @@ def run_data_fold(model, df, n_features, train_indices, test_indices):
         print("Train subjects:", np.sort(df.loc[train_indices, 'subject_id'].unique()), '({})'.format(len(np.sort(df.loc[train_indices, 'subject_id'].unique()))))
         print("Test subjects:", np.sort(df.loc[test_indices, 'subject_id'].unique()), '({})'.format(len(np.sort(df.loc[test_indices, 'subject_id'].unique()))))
         print("Train/test shapes:", X_train.shape, X_test.shape, y_train.shape, y_test.shape)
+        print("Train %PD:",round(df.loc[train_indices, 'y'].sum() / len(train_indices),3))
+        print("Test %PD:",round(df.loc[test_indices, 'y'].sum() / len(test_indices),3))
+        print("Train %male",round(df.loc[train_indices, 'gender'].sum() / len(train_indices),3))
+        print("Test %male",round(df.loc[test_indices, 'gender'].sum()/  len(test_indices),3))
 
     if model == 'RFC':
         return run_ml_model(X_train, X_test, y_train, y_test, test_df)
@@ -47,6 +53,10 @@ def run_data_fold(model, df, n_features, train_indices, test_indices):
 def run_monolingual(dataset, ifm_nifm, model, k=2):
     df, n_features = load_data(dataset, ifm_nifm)
     print("Data shape:", df.shape)
+
+    # Experiment: only include Male/Female participants
+    if gender < 2:
+        df = df[df['gender']==gender]
 
     file_metrics, subject_metrics = [], []
     split_df = df.drop_duplicates(['subject_id'])
@@ -91,10 +101,10 @@ def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_te
         print("Train subjects:", np.sort(base_df.loc[base_train_idc, 'subject_id'].unique()))
         print("Test subjects:", np.sort(base_df.loc[base_test_idc, 'subject_id'].unique()))
         print("Train/test shapes:", base_X_train.shape, base_X_test.shape, base_y_train.shape, base_y_test.shape)
-        print("Train PD:",base_df.loc[base_train_idc, 'y'].sum())
-        print("Test PD:",base_df.loc[base_test_idc, 'y'].sum())
-        print("Train Male",base_df.loc[base_train_idc, 'gender'].sum())
-        print("Test male",base_df.loc[base_test_idc, 'gender'].sum())
+        print("Train %PD:",round(base_df.loc[base_train_idc, 'y'].sum()/ base_df.shape[0],3))
+        print("Test %PD:",round(base_df.loc[base_test_idc, 'y'].sum()/ base_df.shape[0],3))
+        print("Train %male",round(base_df.loc[base_train_idc, 'gender'].sum()/ base_df.shape[0],3))
+        print("Test %male",round(base_df.loc[base_test_idc, 'gender'].sum()/ base_df.shape[0],3))
 
     if model == 'RFC':
         return run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, tgt_df)

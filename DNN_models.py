@@ -64,7 +64,7 @@ def train_model(model, optimizer, criterion, train_loader, num_epochs=10):
 def create_dnn_model(n_features):
     input_size = n_features
     model = DNNModel(input_size)
-    optimizer = optim.AdamW(model.parameters(), lr=0.0001)
+    optimizer = optim.AdamW(model.parameters(), lr=0.0005)
     criterion = nn.CrossEntropyLoss()
     return model, optimizer, criterion
 
@@ -140,7 +140,7 @@ def train_tl_model(model, optimizer, criterion, base_loader, target_loader=None,
             loss.backward()  # Compute gradients
             optimizer.step()  # Update model weights
 
-        if print_intermediate:
+        if print_intermediate and epoch % (num_epochs-1) == 0:
             print(f'Epoch [{epoch+1}/{num_epochs}]: Loss: {loss.item():.4f}')
 
 
@@ -161,7 +161,7 @@ def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_tes
     pos_subjs = list(tgt_df[tgt_df['y'] == 1]['subject_id'].unique())
     neg_subjs = list(tgt_df[tgt_df['y'] == 0]['subject_id'].unique())
     max_shot = min(len(pos_subjs), len(neg_subjs)) - 5
-    # max_shot = 5
+    max_shot = 20
     
     metrics_list, metrics_grouped, base_metrics, n_tgt_train_samples = [], [], [], []
     seed = int(random.random()*10000)
@@ -193,8 +193,8 @@ def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_tes
             tgt_dataset = TensorDataset(tgt_X_train, tgt_y_train)
             tgt_loader = DataLoader(tgt_dataset)#, batch_size=5, shuffle=True)
 
-            train_tl_batch_model(model, optimizer, criterion, base_loader, tgt_loader)
-            # train_tl_model(model, optimizer, criterion, tgt_loader, num_epochs=5)
+            # train_tl_batch_model(model, optimizer, criterion, base_loader, tgt_loader)
+            train_tl_model(model, optimizer, criterion, tgt_loader, num_epochs=5)
 
         tgt_X_test = tgt_test_df.iloc[:, :n_features]
         tgt_X_test = scaler.transform(tgt_X_test.values)  

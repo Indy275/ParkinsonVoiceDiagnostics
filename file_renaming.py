@@ -180,6 +180,20 @@ def pcgita_gender():
 
     df2 = df[['ID', 'Sex']]
     df2.to_csv(os.path.join(store_location,'gender.csv'), index=False)
-# downsample(dataset='PCGITA\\records_tdu\\')
 
-pcgita_gender()
+def combine_dataframes():
+    store_location = os.path.join(data_dir, 'preprocessed_data')
+    df = pd.read_csv(os.path.join(store_location, 'ItalianPDtdu_ifm.csv'))
+    df2 = pd.read_csv(os.path.join(store_location, 'NeuroVoztdu_ifm.csv'))
+    df3 = pd.read_csv(os.path.join(store_location, 'PCGITAtdu_ifm.csv'))
+
+    df2['subject_id'] = df2.apply(lambda x: int(x['subject_id']) + 200, axis=1)
+    df2['sample_id'] = df2.apply(lambda x: int(x['sample_id']) + 200, axis=1)
+
+    df3['subject_id'] = df3.apply(lambda x: int(x['subject_id']) + 400, axis=1)
+    df3['sample_id'] = df3.apply(lambda x: int(x['sample_id']) + 400, axis=1)
+
+    df_all = pd.concat([df, df2, df3])
+    print(df_all.columns, df_all.shape)
+    df_all.to_csv(os.path.join(store_location,'ItalianPDNeuroVozPCGITAtdu_ifm.csv'), index=False)
+combine_dataframes()

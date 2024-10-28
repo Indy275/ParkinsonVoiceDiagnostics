@@ -107,22 +107,6 @@ def get_mfcc(x):
     return mfcc
 
 
-def get_prosodic_features(path_to_file, static_or_dynamic):
-    from disvoice.prosody import Prosody
-
-    prosody = Prosody()
-    prosodic_features = prosody.extract_features_file(path_to_file, static=static_or_dynamic, plots=False, fmt="npy")
-    prosodic_features = prosodic_features[:13].reshape(1, -1)
-    return prosodic_features
-
-
-def get_phonation_features(path_to_file, static_or_dynamic):
-    from disvoice.phonation import Phonation
-    phon = Phonation()
-    phonation_features = phon.extract_features_file(path_to_file, static=static_or_dynamic, plots=False, fmt="npy")
-    return phonation_features
-
-
 def get_features(path_to_file):
     sr = 16000
     x, _ = librosa.core.load(path_to_file, sr=sr)
