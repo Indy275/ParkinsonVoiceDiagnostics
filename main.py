@@ -23,22 +23,21 @@ if speech_task == 'tdu':
 
 if recreate_features:
     import get_features
-    print("Creating {} features for '{}' dataset ".format(ifm_or_nifm, base_dataset))
+    print(f"Creating {ifm_or_nifm} features for '{base_dataset}' dataset ")
     get_features.create_features(base_dataset, ifm_or_nifm)
 
-    if not target_dataset.startswith('pass'):
-        print("Creating {} features for '{}' dataset ".format(ifm_or_nifm, target_dataset))
+    if not target_dataset.startswith('pass') and run_tl_models:
+        print(f"Creating {ifm_or_nifm} features for '{target_dataset}' dataset ")
         get_features.create_features(target_dataset, ifm_or_nifm)
 
 if run_models:
     import run_experiments
-    print("Now running the {} for '{}' dataset with {} features ".format(clf, base_dataset, ifm_or_nifm))
+    print(f"Now running the {ifm_or_nifm} {clf} model with {base_dataset} data ")
     run_experiments.run_monolingual(base_dataset, ifm_or_nifm, model=clf, k=kfolds)
 
 if run_tl_models:
     import run_experiments
-    print("Now running the {} ML model with {}-base and {}-target data ".format(ifm_or_nifm, base_dataset,
-                                                                                target_dataset))
+    print(f"Now running the {ifm_or_nifm} {clf} model with {base_dataset}-base and {target_dataset}-target data ")
     run_experiments.run_crosslingual(base_dataset, target_dataset, ifm_or_nifm, model=clf, k=kfolds)
 
 if plot_results:

@@ -2,6 +2,7 @@ import librosa
 import torch
 import numpy as np
 import pandas as pd
+import scipy.stats as ss
 from sklearn.decomposition import PCA
 from transformers import AutoProcessor, HubertModel
 
@@ -37,19 +38,23 @@ def reduce_dims(df, n_features, n_components=150):
     # plt.tight_layout()
     # plt.show()
 
-    print(f"Explained variance with {n_components} components:", pca.explained_variance_ratio_.cumsum()[150-1])
+    print(f"Explained variance with {n_components} components:", pca.explained_variance_ratio_.cumsum()[n_components-1])
 
     return df2
 
 def aggregate_windows(df):
     feature_cols = df.columns[:-4]
-    df[feature_cols] = df.groupby('subject_id')[feature_cols].transform('mean')
-    df = df.drop_duplicates(subset=['subject_id'])
+    metadata_cols = df.columns[-4:]
+    metadata_df = df.loc[:, metadata_cols]
+    metadata_df = metadata_df.drop_duplicates(subset=['subject_id'])
 
-    aggregations = ['mean', 'std', 'skew', 'kurt']
-
-    aggregated_df = df.groupby('speaker_id').agg({col: aggregations for col in feature_cols})
-
-    aggregated_df.columns = ['_'.join(col).strip() for col in aggregated_df.columns.values]
-    print(aggregated_df.shape, aggregated_df.columns)
+    def std(x): return np.std(x)
+    def skew(x): return ss.skew(x)
+    def kurt(x): return ss.kurtosis(x)
+    aggregations = ['mean', std, skew, kurt]
+    aggregated_df = df.groupby('subject_id').agg({col: aggregations for col in feature_cols}).fillna(0)
+    
+    aggregated_df.columns = ['_'.join(str(col)).strip() for col in aggregated_df.columns.values]
+    aggregated_df = pd.concat([aggregated_dfreset_index(drop=True, inplace=True), metadata_dfreset_index(drop=True, inplace=True)], ignore_index=True, axis=1)
+    aggregated_df.columns = list(aggregated_df.columns[:-4]) + list(metadata_df.columns)
     return aggregated_df

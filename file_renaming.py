@@ -196,4 +196,3 @@ def combine_dataframes():
     df_all = pd.concat([df, df2, df3])
     print(df_all.columns, df_all.shape)
     df_all.to_csv(os.path.join(store_location,'ItalianPDNeuroVozPCGITAtdu_ifm.csv'), index=False)
-combine_dataframes()

@@ -14,8 +14,8 @@ path = parent(parent(__file__))
 
 
 def make_plot(ax, metrics_df, title):
-    ax.plot(metrics_df['Iteration'], metrics_df['Accuracy'], label='Accuracy', marker='o', alpha=0.8)
-    ax.plot(metrics_df['Iteration'], metrics_df['ROC_AUC'], label='ROC AUC', marker='o', alpha=0.8)
+    ax.plot(metrics_df['Iteration'], metrics_df['Accuracy'], label='Target Accuracy', marker='o', alpha=0.8)
+    ax.plot(metrics_df['Iteration'], metrics_df['ROC_AUC'], label='Target ROC AUC', marker='o', alpha=0.8)
     # ax.plot(metrics_df['Iteration'], metrics_df['Sensitivity'], label='Sensitivity', marker='o')
     # ax.plot(metrics_df['Iteration'], metrics_df['Specificity'], label='Specificity', marker='o')
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))

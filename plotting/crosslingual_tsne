@@ -16,7 +16,7 @@ parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'settings.ini'))
 data_dir = config['DATA_SETTINGS']['data_dir']
 
-dataset1 = 'ItalianPDtdu'  # NeuroVoz ItalianPD CzechPD test PCGITA
+dataset1 = 'NeuroVoztdu'  # NeuroVoz ItalianPD CzechPD test PCGITA
 dataset2 = 'PCGITAtdu'
 ifm_or_nifm = 'ifm'
 

@@ -5,7 +5,7 @@ from joblib import dump
 import configparser
 import os
 from sklearn.preprocessing import StandardScaler
-from sklearn.model_selection import train_test_split
+import torch
 
 config = configparser.ConfigParser()
 config.read('settings.ini')
@@ -35,12 +35,60 @@ def scale_features(df, n_features, train_indices, test_indices):
     X_train = df.loc[train_indices, df.columns[:n_features]]
     X_test = df.loc[test_indices, df.columns[:n_features]]
 
-    X_train_scaled = scaler.fit_transform(X_train.values)
+    scaler.partial_fit(X_train.values)
+    X_train_scaled = scaler.transform(X_train.values)
     X_test_scaled = scaler.transform(X_test.values)
 
     df.loc[train_indices, df.columns[:n_features]] = X_train_scaled
     df.loc[test_indices, df.columns[:n_features]] = X_test_scaled
 
-    dump(scaler, 'scaler.pkl')
+    # dump(scaler, 'scaler.pkl')
     
     return scaler, df
+
+
+def get_samples(seed, pos_subjs, neg_subjs, n_shots, df):
+    random.seed(seed)
+    pos_train_samples = random.sample(pos_subjs, min(n_shots, len(pos_subjs)))
+    random.seed(seed)
+    neg_train_samples = random.sample(neg_subjs, min(n_shots, len(neg_subjs)))
+
+    train_df = df[df['subject_id'].isin(pos_train_samples + neg_train_samples)]
+    test_df = df[~df['subject_id'].isin(pos_train_samples + neg_train_samples)]
+
+    return train_df, test_df
+
+
+
+################ NEXT BLOCK TAKEN FROM https://github.com/yhu01/BMS/blob/main/test_standard_bms.py
+def centerDatas(datas):
+    
+    datas = datas - datas.mean(1, keepdim=True)
+    return datas
+
+def scaleEachUnitaryDatas(datas):
+    
+    norms = datas.norm(dim=1, keepdim=True)
+    return datas/norms
+
+def QRreduction(datas):
+    ndatas = torch.linalg.qr(datas.permute(0,1)).R
+    ndatas = ndatas.permute(0,1)
+    return ndatas
+
+def transform_tl_features(data, preprocess='EME'):
+    for p in preprocess:
+        if p=='P':
+            # print("--- preprocess: Power transform")
+            data = torch.sqrt(data+1e-6)
+            
+        elif p=="M":
+            # print("--- preprocess: Mean subtraction")
+            data = centerDatas(data)
+            # print("--- preprocess: QR decomposition")
+            data = QRreduction(data)
+        elif p=="E":
+            # print("--- preprocess: Euclidean normalization")
+            data = scaleEachUnitaryDatas(data)
+
+    return data

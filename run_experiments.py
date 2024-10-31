@@ -64,7 +64,7 @@ def run_monolingual(dataset, ifm_nifm, model, k=2):
 
     kf = StratifiedKFold(n_splits=k, shuffle=True)
     for i, (train_split_indices, test_split_indices) in enumerate(kf.split(split_df['subject_id'], split_df['ygender'])):
-        print(f"Running {model} with data fold {i} of {k}")
+        print(f"Running {model} with data fold {i+1} of {k}")
         df_copy = deepcopy(df)
 
         train_subjects = split_df.iloc[train_split_indices]['subject_id']
@@ -73,7 +73,6 @@ def run_monolingual(dataset, ifm_nifm, model, k=2):
         test_indices = df_copy[df_copy['subject_id'].isin(test_subjects)].index.tolist()
 
         _, df_copy = scale_features(df_copy, n_features, train_indices, test_indices)
-        
         file_metric, subject_metric = run_data_fold(model, df_copy, n_features, train_indices, test_indices)
         file_metrics.append(file_metric)
         subject_metrics.append(subject_metric)
@@ -92,10 +91,10 @@ def run_monolingual(dataset, ifm_nifm, model, k=2):
 
 
 def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_test_idc, tgt_df):
-    base_X_train = base_df.loc[base_train_idc, base_df.columns[:n_features]]
-    base_X_test = base_df.loc[base_test_idc, base_df.columns[:n_features]]
-    base_y_train = base_df.loc[base_train_idc, 'y']
-    base_y_test = base_df.loc[base_test_idc, 'y']
+    base_X_train = base_df.loc[base_train_idc, base_df.columns[:n_features]].values
+    base_X_test = base_df.loc[base_test_idc, base_df.columns[:n_features]].values
+    base_y_train = base_df.loc[base_train_idc, 'y'].values
+    base_y_test = base_df.loc[base_test_idc, 'y'].values
 
     if print_intermediate:
         print("Train subjects:", np.sort(base_df.loc[base_train_idc, 'subject_id'].unique()))
@@ -107,9 +106,9 @@ def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_te
         print("Test %male",round(base_df.loc[base_test_idc, 'gender'].sum()/ base_df.shape[0],3))
 
     if model == 'RFC':
-        return run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, tgt_df)
+        return run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, base_df, tgt_df)
     elif model == 'DNN':
-        return run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, tgt_df)
+        return run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
     
 
 def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
@@ -125,7 +124,7 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
 
     kf = StratifiedKFold(n_splits=k, shuffle=True)
     for i, (train_split_indices, test_split_indices) in enumerate(kf.split(base_df_split['subject_id'], base_df_split['ygender'])):
-        print(f"Running {model} with data fold {i} of {k}")
+        print(f"Running {model} with data fold {i+1} of {k}")
         df_copy = deepcopy(base_df)
 
         train_subjects = base_df_split.iloc[train_split_indices]['subject_id']
@@ -152,4 +151,4 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
     base_metrics_df['Iteration'] = n_tgt_train_samples
     base_metrics_df.to_csv(os.path.join('experiments', f'{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}_base.csv'), index=False)
     
-    print(f'Metrics saved to: experiments/{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}_grouped.csv')
+    print(f'Metrics saved to: experiments/{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}.csv')

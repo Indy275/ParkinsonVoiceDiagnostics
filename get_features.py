@@ -79,7 +79,7 @@ def create_features(dataset, ifm_nifm):
         gender.extend([genderinfo.loc[genderinfo['ID']==int(file[-4:]), 'Sex'].item()] * features.shape[0])
         # updrs.extend([genderinfo.loc[genderinfo['ID']==int(file[-4:]), 'UPDRS scale'].item()] * features.shape[0])
 
-        if id % 20 == 0 and id > 0:
+        if id % 15 == 0 and id > 0:
             save_intermediate_results(X, y, subj_id, sample_id, gender, ifm_nifm, store_location, id)
             X, y, subj_id, sample_id, gender = [], [], [], [], []  # Start with fresh variables
         if id == len(files)-1:

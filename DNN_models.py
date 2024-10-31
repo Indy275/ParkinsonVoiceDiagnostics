@@ -1,13 +1,17 @@
 import random
 import numpy as np
+import pandas as pd
 from copy import deepcopy
 import configparser
+from data_util import get_samples
+from sklearn.preprocessing import StandardScaler
 
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 import torch.nn.functional as F
 import torch.optim as optim
+import matplotlib.pyplot as plt
 
 from eval import evaluate_predictions
 
@@ -18,7 +22,7 @@ print_intermediate = config.getboolean('OUTPUT_SETTINGS', 'print_intermediate')
 
 
 class DNNModel(nn.Module):
-    def __init__(self, input_size, dropout_prob=0.2):
+    def __init__(self, input_size, dropout_prob=0.25):
         super(DNNModel, self).__init__()
 
         hidden_size1 = 1024
@@ -64,7 +68,7 @@ def train_model(model, optimizer, criterion, train_loader, num_epochs=10):
 def create_dnn_model(n_features):
     input_size = n_features
     model = DNNModel(input_size)
-    optimizer = optim.AdamW(model.parameters(), lr=0.0005)
+    optimizer = optim.AdamW(model.parameters(), lr=0.0001)
     criterion = nn.CrossEntropyLoss()
     return model, optimizer, criterion
 
@@ -144,19 +148,22 @@ def train_tl_model(model, optimizer, criterion, base_loader, target_loader=None,
             print(f'Epoch [{epoch+1}/{num_epochs}]: Loss: {loss.item():.4f}')
 
 
-def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, tgt_df):
+def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df):
     n_features = base_X_train.shape[1]
 
-    base_X_train = torch.tensor(base_X_train.values).to(torch.float32)
-    base_X_test = torch.tensor(base_X_test.values).to(torch.float32)
-    base_y_train = torch.tensor(base_y_train.values)
-    base_y_test = base_y_test.values
+    base_X_train = torch.tensor(base_X_train).to(torch.float32)
+    base_X_test = torch.tensor(base_X_test).to(torch.float32)
+    base_y_train = torch.tensor(base_y_train)
+    base_y_test = base_y_test
     base_model, optimizer, criterion = create_dnn_model(n_features)
 
     base_dataset = TensorDataset(base_X_train, base_y_train)
     base_loader = DataLoader(base_dataset)#, batch_size=5, shuffle=True)
 
     train_tl_model(base_model, optimizer, criterion, base_loader, target_loader=None)
+
+    base_pos_subjs = list(base_df[base_df['y'] == 1]['subject_id'].unique())
+    base_neg_subjs = list(base_df[base_df['y'] == 0]['subject_id'].unique())
 
     pos_subjs = list(tgt_df[tgt_df['y'] == 1]['subject_id'].unique())
     neg_subjs = list(tgt_df[tgt_df['y'] == 0]['subject_id'].unique())
@@ -166,38 +173,40 @@ def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_tes
     metrics_list, metrics_grouped, base_metrics, n_tgt_train_samples = [], [], [], []
     seed = int(random.random()*10000)
     for n_shots in range(max_shot+1):
-        # model = base_model
+        scaler_copy = deepcopy(scaler)
         model = deepcopy(base_model)
-        # model = type(base_model)(n_features)
         model.load_state_dict(base_model.state_dict())
-        # model.fc2.weight.requires_grad = False
-        # model.fc2.bias.requires_grad = False
-        optimizer = optim.AdamW(model.parameters(), lr=0.001)
-
-        random.seed(seed)
-        pos_train_samples = random.sample(pos_subjs, n_shots)
-        random.seed(seed)
-        neg_train_samples = random.sample(neg_subjs, n_shots)
-
-        tgt_train_df = tgt_df[tgt_df['subject_id'].isin(pos_train_samples + neg_train_samples)]
-        tgt_test_df = tgt_df[~tgt_df['subject_id'].isin(pos_train_samples + neg_train_samples)]
+        optimizer = optim.AdamW(model.parameters(), lr=0.0005)
 
         if n_shots > 0:
-            # Train model with these additional samples
-            tgt_X_train = tgt_train_df.iloc[:, :n_features]
-            tgt_y_train = tgt_train_df['y']
-            tgt_X_train = scaler.transform(tgt_X_train.values)  # Uncertain if this is correct way
+            # Fine-tune model with pos and neg samples from base and target set
+            base_train_df, _ = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots/4)), base_df)
+            tgt_train_df, tgt_test_df = get_samples(seed, pos_subjs, neg_subjs, n_shots, tgt_df)
+
+            # Add target train data to scaler fit
+            scaler_copy.partial_fit(tgt_train_df.iloc[:, :n_features].values) 
+
+            # Transform target train and test data
+            tgt_train_df.iloc[:, :n_features] = scaler_copy.transform(tgt_train_df.iloc[:, :n_features].values)
+            tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)
+
+            tgt_train_df = pd.concat([tgt_train_df, base_train_df])
+
+            tgt_X_train = tgt_train_df.iloc[:, :n_features].values
             tgt_X_train = torch.tensor(tgt_X_train).to(torch.float32)
-            tgt_y_train = torch.tensor(tgt_y_train.values)
+            tgt_y_train = torch.tensor(tgt_train_df['y'].values)
 
             tgt_dataset = TensorDataset(tgt_X_train, tgt_y_train)
             tgt_loader = DataLoader(tgt_dataset)#, batch_size=5, shuffle=True)
 
             # train_tl_batch_model(model, optimizer, criterion, base_loader, tgt_loader)
             train_tl_model(model, optimizer, criterion, tgt_loader, num_epochs=5)
+        elif n_shots == 0:
+            # Use entire tgt set for evaluation
+            tgt_test_df = deepcopy(tgt_df)
+            tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)
 
-        tgt_X_test = tgt_test_df.iloc[:, :n_features]
-        tgt_X_test = scaler.transform(tgt_X_test.values)  
+        tgt_X_test = tgt_test_df.iloc[:, :n_features].values
         tgt_X_test = torch.tensor(tgt_X_test).to(torch.float32)
         tgt_y_test = tgt_test_df['y']
 
