@@ -16,14 +16,21 @@ parent = os.path.dirname
 config.read(os.path.join(parent(parent(__file__)), 'settings.ini'))
 data_dir = config['DATA_SETTINGS']['data_dir']
 
-dataset1 = 'NeuroVoztdu'  # NeuroVoz ItalianPD CzechPD test PCGITA
-dataset2 = 'PCGITAtdu'
+dataset1 = 'NeuroVoz'  # NeuroVoz ItalianPD CzechPD test PCGITA
+dataset2 = 'PCGITA'
+speech_task = 'tdu'
+
 ifm_or_nifm = 'ifm'
 
+
+if speech_task == 'tdu':
+    dataset1 += 'tdu'
+    dataset2 += 'tdu'
+
 df1, n_features = load_data(dataset1, ifm_or_nifm)
-df1['ID'] = 'Italian'
+df1['ID'] = dataset1
 df2, n_features = load_data(dataset2, ifm_or_nifm)
-df2['ID'] = 'PC-GITA'
+df2['ID'] = dataset2
 
 df = pd.concat([df1, df2])
 X = df.iloc[:, :n_features]
@@ -41,8 +48,11 @@ df['tsne-2d-one'] = tsne_results[:, 0]
 df['tsne-2d-two'] = tsne_results[:, 1]
 df['y'] = y.values
 df['ID'] = id.values
+df2 = df[df['ID']== dataset2] 
+df = df[df['ID']== dataset1] 
 
 plt.figure(figsize=(8, 8))
-ax = sns.scatterplot(x="tsne-2d-one", y="tsne-2d-two", hue="ID", palette=sns.color_palette("bright", 2), data=df, alpha=0.75)
-ax.set(xlabel='First dimension', ylabel='Second dimension', title=f'{dataset1}, {dataset2}: 176 features compressed into two dimensions')
+ax = sns.scatterplot(x="tsne-2d-one", y="tsne-2d-two", hue="y", palette=sns.color_palette("Blues", 2), data=df, alpha=0.75)
+ax = sns.scatterplot(x="tsne-2d-one", y="tsne-2d-two", hue="y", palette=sns.color_palette("YlOrBr", 2), data=df2, alpha=0.75)
+ax.set(xlabel='First dimension', ylabel='Second dimension', title=f'{dataset1}, {dataset2}: {X.shape[1]} features compressed into two dimensions')
 plt.show()
