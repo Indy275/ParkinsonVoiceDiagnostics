@@ -6,6 +6,7 @@ import pandas as pd
 import configparser
 import matplotlib.pyplot as plt
 
+# from skmultiflow.meta import AdaptiveRandomForestClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import SGDClassifier
 from eval import evaluate_predictions
@@ -76,7 +77,7 @@ def run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test
     n_features = np.shape(base_X_train)[1]
     # base_clf = RandomForestClassifier()
     base_clf = SGDClassifier()
-    base_clf.fit(base_X_train, base_y_train, classes=np.unique(base_y_train))
+    base_clf.partial_fit(base_X_train, base_y_train)#, classes=np.unique(base_y_train))
 
     base_pos_subjs = list(base_df[base_df['y'] == 1]['subject_id'].unique())
     base_neg_subjs = list(base_df[base_df['y'] == 0]['subject_id'].unique())
@@ -102,13 +103,13 @@ def run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test
             # Transform target train and test data
             tgt_train_df.iloc[:, :n_features] = scaler_copy.transform(tgt_train_df.iloc[:, :n_features].values)
             tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)
-
+            tgt_train_df.reset_index(drop=True, inplace=True) 
+            base_train_df.reset_index(drop=True, inplace=True) 
             tgt_train_df = pd.concat([tgt_train_df, base_train_df])
-
             tgt_X_train = tgt_train_df.iloc[:, :n_features].values
             tgt_y_train = tgt_train_df['y'].values
 
-            clf.fit(tgt_X_train, tgt_y_train)
+            clf.partial_fit(tgt_X_train, tgt_y_train)
         elif n_shots == 0:
             # Use entire tgt set for evaluation
             tgt_test_df = deepcopy(tgt_df)

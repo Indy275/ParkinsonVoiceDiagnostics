@@ -196,3 +196,21 @@ def combine_dataframes():
     df_all = pd.concat([df, df2, df3])
     print(df_all.columns, df_all.shape)
     df_all.to_csv(os.path.join(store_location,'ItalianPDNeuroVozPCGITAtdu_ifm.csv'), index=False)
+
+
+def fuckup():
+    store_location = os.path.join(data_dir, 'preprocessed_data', 'NeuroVoztdu_nifm.csv')
+    store_location2 = os.path.join(data_dir, 'preprocessed_data', 'ItalianPDtdu_nifm.csv')
+
+    df = pd.read_csv(store_location)
+    print(df.columns)
+
+    df2 = pd.read_csv(store_location2)
+    print(df2.columns)
+    df2.columns = df.columns
+
+    print("after",df2.columns, df.columns)
+
+
+    df2.to_csv(os.path.join(store_location2), index=False)
+fuckup()

@@ -47,14 +47,16 @@ def aggregate_windows(df):
     metadata_cols = df.columns[-4:]
     metadata_df = df.loc[:, metadata_cols]
     metadata_df = metadata_df.drop_duplicates(subset=['subject_id'])
+    df[feature_cols] = df[feature_cols].apply(pd.to_numeric, errors='coerce').fillna(0)
 
     def std(x): return np.std(x)
     def skew(x): return ss.skew(x)
     def kurt(x): return ss.kurtosis(x)
     aggregations = ['mean', std, skew, kurt]
     aggregated_df = df.groupby('subject_id').agg({col: aggregations for col in feature_cols}).fillna(0)
-    
+    aggregated_df.reset_index(drop=True, inplace=True)
+    metadata_df.reset_index(drop=True, inplace=True)
     aggregated_df.columns = ['_'.join(str(col)).strip() for col in aggregated_df.columns.values]
-    aggregated_df = pd.concat([aggregated_dfreset_index(drop=True, inplace=True), metadata_dfreset_index(drop=True, inplace=True)], ignore_index=True, axis=1)
+    aggregated_df = pd.concat([aggregated_df, metadata_df], ignore_index=True, axis=1)
     aggregated_df.columns = list(aggregated_df.columns[:-4]) + list(metadata_df.columns)
     return aggregated_df
