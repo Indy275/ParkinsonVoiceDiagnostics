@@ -25,11 +25,16 @@ def get_dirs(dataset):
         folder = 'test'
         dir = os.path.join(data_dir , 'NeuroVoz', 'subsample')
     else:
-        print(" '{}' is not a valid data set ".format(dataset))
-        return
+        folder = dataset[:-3]
+        dir = os.path.join(data_dir , folder, 'records')
+
     if speech_task == 'tdu':
         dir = os.path.join(data_dir , folder, 'records_tdu')
         folder = folder + 'tdu'
+    elif speech_task == 'ddk':
+        dir = os.path.join(data_dir , folder, 'records_ddk')
+        folder = folder + 'ddk'
+
     store_location = (os.path.join(data_dir, 'preprocessed_data'), folder)
 
     return dir, store_location
@@ -37,7 +42,13 @@ def get_dirs(dataset):
 
 def load_files(datadir):
     files = []
-    task = 'TDU' if speech_task == 'tdu' else r'A\d'
+    if speech_task == 'ddk':
+        task = 'DDK'
+    elif speech_task == 'tdu': 
+        task = 'TDU'
+    else:
+        task = r'A\d'
+
     for file in os.listdir(datadir):
         if re.match(r".*^[A-Z]{2}_"+task+"_\d+$", file[:-4]):
             files.append(file[:-4])
