@@ -77,7 +77,7 @@ def run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test
     n_features = np.shape(base_X_train)[1]
     # base_clf = RandomForestClassifier()
     base_clf = SGDClassifier()
-    base_clf.partial_fit(base_X_train, base_y_train)#, classes=np.unique(base_y_train))
+    base_clf.partial_fit(base_X_train, base_y_train, classes=np.unique(base_y_train))
 
     base_pos_subjs = list(base_df[base_df['y'] == 1]['subject_id'].unique())
     base_neg_subjs = list(base_df[base_df['y'] == 0]['subject_id'].unique())
@@ -94,7 +94,7 @@ def run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test
 
         if n_shots > 0:
              # Fine-tune model with pos and neg samples from base and target set
-            base_train_df, _ = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots/2)), base_df)
+            # base_train_df, _ = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots/2)), base_df)
             tgt_train_df, tgt_test_df = get_samples(seed, pos_subjs, neg_subjs, n_shots, tgt_df)
 
             # Add target train data to scaler fit
@@ -104,8 +104,8 @@ def run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test
             tgt_train_df.iloc[:, :n_features] = scaler_copy.transform(tgt_train_df.iloc[:, :n_features].values)
             tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)
             tgt_train_df.reset_index(drop=True, inplace=True) 
-            base_train_df.reset_index(drop=True, inplace=True) 
-            tgt_train_df = pd.concat([tgt_train_df, base_train_df])
+            # base_train_df.reset_index(drop=True, inplace=True) 
+            # tgt_train_df = pd.concat([tgt_train_df, base_train_df])
             tgt_X_train = tgt_train_df.iloc[:, :n_features].values
             tgt_y_train = tgt_train_df['y'].values
 

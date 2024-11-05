@@ -42,7 +42,7 @@ def combine_dfs(store_location, ifm_nifm):
     
     if ifm_nifm.startswith('nifm'):
         import get_nifm_features
-        df = get_nifm_features.reduce_dims(df, len(df.columns)-5)
+        # df = get_nifm_features.reduce_dims(df, len(df.columns)-5)
         df = get_nifm_features.aggregate_windows(df)
 
     df.to_csv(os.path.join(store_location[0], f"{store_location[1]}_{ifm_nifm}.csv"), index=False)

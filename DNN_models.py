@@ -180,7 +180,7 @@ def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_tes
 
         if n_shots > 0:
             # Fine-tune model with pos and neg samples from base and target set
-            base_train_df, _ = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots/4)), base_df)
+            # base_train_df, _ = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots/4)), base_df)
             tgt_train_df, tgt_test_df = get_samples(seed, pos_subjs, neg_subjs, n_shots, tgt_df)
 
             # Add target train data to scaler fit
@@ -190,7 +190,7 @@ def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_tes
             tgt_train_df.iloc[:, :n_features] = scaler_copy.transform(tgt_train_df.iloc[:, :n_features].values)
             tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)
 
-            tgt_train_df = pd.concat([tgt_train_df, base_train_df])
+            # tgt_train_df = pd.concat([tgt_train_df, base_train_df])
 
             tgt_X_train = tgt_train_df.iloc[:, :n_features].values
             tgt_X_train = torch.tensor(tgt_X_train).to(torch.float32)
