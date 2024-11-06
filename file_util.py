@@ -6,6 +6,8 @@ config = configparser.ConfigParser()
 config.read('settings.ini')
 data_dir = config['DATA_SETTINGS']['data_dir']
 speech_task = config['DATA_SETTINGS']['speech_task']
+normalize_audio = config.getboolean('DATA_SETTINGS', 'normalize_audio')
+
 
 
 def get_dirs(dataset):
@@ -30,13 +32,17 @@ def get_dirs(dataset):
 
     if speech_task == 'tdu':
         dir = os.path.join(data_dir , folder, 'records_tdu')
-        folder = folder + 'tdu'
+        folder += 'tdu'
     elif speech_task == 'ddk':
         dir = os.path.join(data_dir , folder, 'records_ddk')
-        folder = folder + 'ddk'
+        folder += 'ddk'
+    
+    if normalize_audio:
+        dir += '_norm'
+        folder += '_norm'
 
     store_location = (os.path.join(data_dir, 'preprocessed_data'), folder)
-
+    print("Load data from dir:", dir, store_location)
     return dir, store_location
 
 
