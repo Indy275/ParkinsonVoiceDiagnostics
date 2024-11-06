@@ -12,6 +12,8 @@ config.read('settings.ini')
 data_dir = config['DATA_SETTINGS']['data_dir']
 
 
+############################### NeuroVoz ###############################
+
 def rename_neurovoz_ddk():
     dir = data_dir + "NeuroVoz\\DDK\\"
     modified_dir = data_dir + "NeuroVoz\\records_ddk\\"
@@ -21,7 +23,6 @@ def rename_neurovoz_ddk():
         output_fname = os.path.join(modified_dir, f"{file[:2]}_DDK_{file[-8:-4]}.wav")
         shutil.copy(os.path.join(dir, file), os.path.join(modified_dir, output_fname))
     print(len(files))
-rename_neurovoz_ddk()
 
 def rename_neurovoz_files():
     dir = data_dir + "NeuroVoz\\audios\\"
@@ -33,7 +34,6 @@ def rename_neurovoz_files():
             files.append(file[:-4])
             shutil.copy(os.path.join(dir, file), os.path.join(modified_dir, file))
     print(len(files))
-
 
 def rename_neurovoz_files_tdu():
     dir = data_dir + "NeuroVoz\\audios\\"
@@ -56,9 +56,27 @@ def rename_neurovoz_files_tdu():
         output_fname = os.path.join(modified_dir, f"{subj_id[:2]}_TDU_{subj_id[-4:]}.wav")
         concat_audio.export(output_fname, format='wav')
 
+def neurovoz_sex():
+    dir = data_dir + "NeuroVoz\\metadata\\"
+    hc = pd.read_csv(dir + 'data_hc.csv', index_col=None, header=0)
+    pwp = pd.read_csv(dir + 'data_pd.csv', index_col=None, header=0)
+
+    df_1 = hc.loc[:, ['ID', 'Sex']]
+    df_1['UPDRS scale'] = 0
+    df_2 = pwp.loc[:, ['ID', 'UPDRS scale', 'Sex']]
+
+    df = pd.concat([df_1, df_2])
+    df.drop_duplicates(inplace=True)
+    df['Sex'].fillna(1, inplace=True)
+    df['ID'] = df['ID'].apply(lambda x: str(x).zfill(4))
+    df.to_csv(dir + 'gender.csv', index=False)
+
+
+############################### PC-GITA ###############################
+
 def rename_pcgita_files():
-    dir = data_dir + "PC-GITA\\sentences\\"
-    modified_dir = data_dir + "PC-GITA\\records_tdu\\"
+    dir = data_dir + "PCGITA\\pataka\\"
+    modified_dir = data_dir + "PCGITA\\records_ddk\\"
     subj_files = defaultdict(list)
 
     for subdir, dirs, files in os.walk(dir):
@@ -69,21 +87,39 @@ def rename_pcgita_files():
                 subject_id = 'PD_{:04d}'.format([int(s) for s in re.findall(r'\d+', file)][0])
             f_path = os.path.join(subdir, file)
             subj_files[subject_id].append(f_path)
-    print(len(subj_files))
-    for k, v in subj_files.items():
-        print(k, len(v))
+    # print(len(subj_files))
+    # for k, v in subj_files.items():
+    #     print(k, len(v))
 
     for subj_id, files in subj_files.items():
         concat_audio = None
-        if len(files) > 1:
-            for audio_file in files:
-                audio = AudioSegment.from_wav(audio_file)
-                if concat_audio is None:
-                    concat_audio = audio
-                else: concat_audio += audio
-            output_fname = os.path.join(modified_dir, f"{subj_id[:2]}_TDU_{subj_id[-4:]}.wav")
-            concat_audio.export(output_fname, format='wav')
+        for audio_file in files:
+            audio = AudioSegment.from_wav(audio_file)
+            if concat_audio is None:
+                concat_audio = audio
+            else: concat_audio += audio
+        output_fname = os.path.join(modified_dir, f"{subj_id[:2]}_DDK_{subj_id[-4:]}.wav")
+        concat_audio.export(output_fname, format='wav')
 
+
+def pcgita_gender():
+    store_location = os.path.join(data_dir, 'PCGITA')
+    df = pd.read_csv(os.path.join(store_location, 'PCGITA_metadata.csv'), header=0, delimiter=';', nrows=100)
+    df.columns = df.columns.str.replace(' ', '')
+    df['ORIG_ID'] = df['RECODINGORIGINALNAME'].str[-4:]
+    df['Indication'] = df['RECODINGORIGINALNAME'].str[-5] == 'C'
+    df.fillna(value=0, inplace=True)
+    df['ID'] = df.apply(lambda x: int(x['ORIG_ID']) + 100 if x['Indication'] else int(x['ORIG_ID']), axis=1)
+    df['ID'] = df['ID'].apply(lambda x: str(x).zfill(4))
+
+    df['Sex'] = df.apply(lambda x: 1 if x['SEX']=='M' else 0, axis=1)
+    df['Sex'] = df['SEX']
+
+    df2 = df[['ID', 'Sex']]
+    df2.to_csv(os.path.join(store_location,'gender.csv'), index=False)
+
+
+############################### CzechPD ###############################
 
 def rename_czech_files():
     dir = data_dir + "CzechPD\\records\\"
@@ -101,6 +137,10 @@ def rename_czech_files():
             shutil.copy(os.path.join(dir, file), os.path.join(modified_dir, new_fname))
 
 
+
+############################### IPVS ###############################
+
+
 def get_gender(string):
     match = re.search(r'[a-zA-Z](?=[^a-zA-Z]*$)', string).group(0)
     return 1 if match == 'M' else 0
@@ -112,12 +152,26 @@ def get_files_per_task():
     subj_files_a = defaultdict(list)
     subj_files_ddk = defaultdict(list)
     subj_files_tdu = defaultdict(list)
+    genderinfo = defaultdict(list)
+    id_list = defaultdict(list)
+    new_id_count = 0
 
     for i, folder in enumerate(data_folders):
         dir = data_dir + "ItalianPD\\{}\\".format(folder)
         for subdir, dirs, files in os.walk(dir):
+            
+            id = subdir.split('\\')[-1]
+            if id in id_list:
+                new_id = id_list[id]
+            else:
+                new_id_count += 1
+                new_id = "{:04d}".format(new_id_count)
+                id_list[id] = new_id
+            
             for file in files:
-                subj_name = status[i] + file[3:15]
+                subj_name = status[i] + new_id
+                gender = get_gender(file[3:15])
+                genderinfo[subj_name] = gender
                 f_path = os.path.join(subdir, file)
                 if file[0] == 'D': 
                     subj_files_a[subj_name].append(f_path)
@@ -125,12 +179,10 @@ def get_files_per_task():
                     subj_files_ddk[subj_name].append(f_path)
                 if file[:2] == 'FB':
                     subj_files_tdu[subj_name].append(f_path)
-    return subj_files_a, subj_files_ddk, subj_files_tdu
+    return subj_files_a, subj_files_ddk, subj_files_tdu, genderinfo
 
 
 def concat_files(subj_files, new_name, new_dir):
-    genderinfo = []
-    new_id = 1
     for subj_id, files in subj_files.items():
         concat_audio = None
         for audio_file in files:
@@ -138,42 +190,26 @@ def concat_files(subj_files, new_name, new_dir):
             if concat_audio is None:
                 concat_audio = audio
             else: concat_audio += audio
-        gender = get_gender(subj_id)
-        genderinfo.append(('{:04d}'.format(new_id), gender))
-        output_fname = os.path.join(new_dir, f"{subj_id[:2]}_{new_name}"+ "_{:04d}.wav".format(new_id))
-        concat_audio.export(output_fname, format='wav')
-        new_id += 1
-    return genderinfo
+        output_fname = os.path.join(new_dir, f"{subj_id[:2]}_{new_name}_{subj_id[2:]}")
+        concat_audio.export(output_fname+'.wav', format='wav')
 
 def rename_italian_files():
     modified_dir = data_dir + "ItalianPD\\records"
     new_dirs = [modified_dir+"\\", modified_dir+"_ddk\\", modified_dir+"_tdu\\"]
-    subj_files_a, subj_files_ddk, subj_files_tdu = get_files_per_task()
-    genderinfo = []
+    subj_files_a, subj_files_ddk, subj_files_tdu, genderinfo = get_files_per_task()
     for files, name, dir in zip([subj_files_a, subj_files_ddk, subj_files_tdu], ['A1', 'DDK', 'TDU'], new_dirs):
-        genderlist = concat_files(files, name, dir)
-        genderinfo.extend(genderlist)
-    genderinfo = np.array(genderinfo)
-    genderDF = pd.DataFrame(genderinfo, columns=['ID', 'Sex'])
-    genderDF.drop_duplicates(inplace=True)
-    genderDF.to_csv(modified_dir + 'gender.csv', index=False)
+        concat_files(files, name, dir)
 
-rename_italian_files()
+    print(genderinfo)
+    df = pd.DataFrame.from_dict(genderinfo.items())
+    df.columns = ['ID', 'Sex']
+    df = df.explode('Sex')
+    df['ID'] = df['ID'].str[2:]
+    print(df)
+    df.to_csv(data_dir + 'ItalianPD\\gender.csv', index=False)
 
-def neurovoz_sex():
-    dir = data_dir + "NeuroVoz\\metadata\\"
-    hc = pd.read_csv(dir + 'data_hc.csv', index_col=None, header=0)
-    pwp = pd.read_csv(dir + 'data_pd.csv', index_col=None, header=0)
 
-    df_1 = hc.loc[:, ['ID', 'Sex']]
-    df_1['UPDRS scale'] = 0
-    df_2 = pwp.loc[:, ['ID', 'UPDRS scale', 'Sex']]
 
-    df = pd.concat([df_1, df_2])
-    df.drop_duplicates(inplace=True)
-    df['Sex'].fillna(1, inplace=True)
-    df['ID'] = df['ID'].apply(lambda x: str(x).zfill(4))
-    df.to_csv(dir + 'gender.csv', index=False)
 
 
 def downsample(dataset, target_sample_rate=16000):
@@ -207,21 +243,7 @@ def modify_orig_id(row):
         return int(row['ORIG_ID'])
 
 
-def pcgita_gender():
-    store_location = os.path.join(data_dir, 'PCGITA')
-    df = pd.read_csv(os.path.join(store_location, 'PCGITA_metadata.csv'), header=0, delimiter=';', nrows=100)
-    df.columns = df.columns.str.replace(' ', '')
-    df['ORIG_ID'] = df['RECODINGORIGINALNAME'].str[-4:]
-    df['Indication'] = df['RECODINGORIGINALNAME'].str[-5] == 'C'
-    df.fillna(value=0, inplace=True)
-    df['ID'] = df.apply(lambda x: int(x['ORIG_ID']) + 100 if x['Indication'] else int(x['ORIG_ID']), axis=1)
-    df['ID'] = df['ID'].apply(lambda x: str(x).zfill(4))
 
-    df['Sex'] = df.apply(lambda x: 1 if x['SEX']=='M' else 0, axis=1)
-    df['Sex'] = df['SEX']
-
-    df2 = df[['ID', 'Sex']]
-    df2.to_csv(os.path.join(store_location,'gender.csv'), index=False)
 
 def combine_dataframes():
     store_location = os.path.join(data_dir, 'preprocessed_data')

@@ -34,7 +34,7 @@ def plot_TL_performance(base_dataset, target_dataset):
     metrics_grouped = pd.read_csv(os.path.join(path, 'experiments', f'{clf_name}_{ifm_or_nifm}_metrics_{base_dataset}_{target_dataset}_grouped.csv'))
     base_metrics = pd.read_csv(os.path.join(path, 'experiments', f'{clf_name}_{ifm_or_nifm}_metrics_{base_dataset}_{target_dataset}_base.csv'))
 
-    if base_dataset[-3:] != 'tdu':
+    if base_dataset[-3:] != 'tdu' and base_dataset[-3:] != 'ddk':
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
 
         # Plot File/Window-Level performance
