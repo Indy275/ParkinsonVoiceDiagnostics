@@ -20,6 +20,9 @@ plot_results = config.getboolean('OUTPUT_SETTINGS', 'plot_results')
 if speech_task == 'tdu':
     base_dataset += 'tdu'
     target_dataset += 'tdu'
+elif speech_task == 'ddk':
+    base_dataset += 'ddk'
+    target_dataset += 'ddk'
 
 if recreate_features:
     import get_features
@@ -47,3 +50,7 @@ if plot_results:
     if run_models:
         #todo: monolingual plotting
         pass
+
+
+import pretrained_model
+pretrained_model.train_ptm(base_dataset)

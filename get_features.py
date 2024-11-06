@@ -15,6 +15,9 @@ def save_intermediate_results(X, y, subj_id, sample_id, gender, ifm_nifm, store_
 
     data = np.hstack((X, y, subj_id, sample_id, gender))
     df = pd.DataFrame(data=data, columns=list(range(X.shape[1])) + ['y', 'subject_id', 'sample_id', 'gender'])
+    if ifm_nifm.startswith('nifm'):
+        import get_nifm_features
+        df = get_nifm_features.reduce_dims(df, len(df.columns)-4)
 
     df.to_csv(os.path.join(store_location[0], f"{store_location[1]}_{ifm_nifm}_{id}.csv"), index=False)
     print(f'Intermediate data saved to {store_location[0]}.')
@@ -40,10 +43,10 @@ def combine_dfs(store_location, ifm_nifm):
                                                                              len([i for i in df['y'] if
                                                                                   i == 0])))
     
-    if ifm_nifm.startswith('nifm'):
-        import get_nifm_features
-        # df = get_nifm_features.reduce_dims(df, len(df.columns)-5)
-        df = get_nifm_features.aggregate_windows(df)
+    # if ifm_nifm.startswith('nifm'):
+    #     import get_nifm_features
+    #     # df = get_nifm_features.reduce_dims(df, len(df.columns)-5)
+    #     df = get_nifm_features.aggregate_windows(df)
 
     df.to_csv(os.path.join(store_location[0], f"{store_location[1]}_{ifm_nifm}.csv"), index=False)
 
@@ -79,7 +82,7 @@ def create_features(dataset, ifm_nifm):
         gender.extend([genderinfo.loc[genderinfo['ID']==int(file[-4:]), 'Sex'].item()] * features.shape[0])
         # updrs.extend([genderinfo.loc[genderinfo['ID']==int(file[-4:]), 'UPDRS scale'].item()] * features.shape[0])
 
-        if id % 15 == 0 and id > 0:
+        if id % 20 == 0 and id > 0:
             save_intermediate_results(X, y, subj_id, sample_id, gender, ifm_nifm, store_location, id)
             X, y, subj_id, sample_id, gender = [], [], [], [], []  # Start with fresh variables
         if id == len(files)-1:

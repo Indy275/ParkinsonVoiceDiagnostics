@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 # from skmultiflow.meta import AdaptiveRandomForestClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import SGDClassifier
+from sklearn.svm import SVC
 from eval import evaluate_predictions
 
 from data_util import get_samples
@@ -20,7 +21,8 @@ print_intermediate = config.getboolean('OUTPUT_SETTINGS', 'print_intermediate')
 
 
 def run_ml_model(X_train, X_test, y_train, y_test, test_df):
-    clf = RandomForestClassifier()
+    # clf = RandomForestClassifier()
+    clf = SVC()
     clf.fit(X_train, y_train)
     preds = clf.predict(X_test)
     test_df['preds'] = preds
@@ -94,23 +96,23 @@ def run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test
 
         if n_shots > 0:
              # Fine-tune model with pos and neg samples from base and target set
-            # base_train_df, _ = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots/2)), base_df)
+            base_train_df, _ = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots/6)), base_df)
             tgt_train_df, tgt_test_df = get_samples(seed, pos_subjs, neg_subjs, n_shots, tgt_df)
 
             # Add target train data to scaler fit
             scaler_copy.partial_fit(tgt_train_df.iloc[:, :n_features].values) 
-
-            # Transform target train and test data
             tgt_train_df.iloc[:, :n_features] = scaler_copy.transform(tgt_train_df.iloc[:, :n_features].values)
             tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)
+
             tgt_train_df.reset_index(drop=True, inplace=True) 
-            # base_train_df.reset_index(drop=True, inplace=True) 
-            # tgt_train_df = pd.concat([tgt_train_df, base_train_df])
+            base_train_df.reset_index(drop=True, inplace=True) 
+            tgt_train_df = pd.concat([tgt_train_df, base_train_df])
+
             tgt_X_train = tgt_train_df.iloc[:, :n_features].values
             tgt_y_train = tgt_train_df['y'].values
 
             clf.partial_fit(tgt_X_train, tgt_y_train)
-        elif n_shots == 0:
+        else:  # n_shots == 0
             # Use entire tgt set for evaluation
             tgt_test_df = deepcopy(tgt_df)
             tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import configparser
 
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedKFold
 from data_util import load_data, scale_features
 
@@ -77,11 +78,12 @@ def run_monolingual(dataset, ifm_nifm, model, k=2):
         file_metrics.append(file_metric)
         subject_metrics.append(subject_metric)
 
-    print("File-level performance:")
-    print("Mean Acc:", round(sum(i[0] for i in file_metrics)/k, 3))
-    print("Mean AUC:", round(sum(i[1] for i in file_metrics)/k, 3))
-    print("Mean Sens:", round(sum(i[2] for i in file_metrics)/k, 3))
-    print("Mean Spec:", round(sum(i[3] for i in file_metrics)/k, 3))
+    if dataset[-3:] != 'tdu' and dataset[-3:] != 'ddk':
+        print("File-level performance:")
+        print("Mean Acc:", round(sum(i[0] for i in file_metrics)/k, 3))
+        print("Mean AUC:", round(sum(i[1] for i in file_metrics)/k, 3))
+        print("Mean Sens:", round(sum(i[2] for i in file_metrics)/k, 3))
+        print("Mean Spec:", round(sum(i[3] for i in file_metrics)/k, 3))
 
     print("Speaker-level performance:")
     print("Mean Acc:", round(sum(i[0] for i in subject_metrics)/k, 3))
@@ -100,10 +102,10 @@ def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_te
         print("Train subjects:", np.sort(base_df.loc[base_train_idc, 'subject_id'].unique()))
         print("Test subjects:", np.sort(base_df.loc[base_test_idc, 'subject_id'].unique()))
         print("Train/test shapes:", base_X_train.shape, base_X_test.shape, base_y_train.shape, base_y_test.shape)
-        print("Train %PD:",round(base_df.loc[base_train_idc, 'y'].sum()/ base_df.shape[0],3))
-        print("Test %PD:",round(base_df.loc[base_test_idc, 'y'].sum()/ base_df.shape[0],3))
-        print("Train %male",round(base_df.loc[base_train_idc, 'gender'].sum()/ base_df.shape[0],3))
-        print("Test %male",round(base_df.loc[base_test_idc, 'gender'].sum()/ base_df.shape[0],3))
+        print("Train %PD:",round(base_df.loc[base_train_idc, 'y'].sum()/ len(base_train_idc),3))
+        print("Test %PD:",round(base_df.loc[base_test_idc, 'y'].sum()/ len(base_test_idc),3))
+        print("Train %male",round(base_df.loc[base_train_idc, 'gender'].sum()/ len(base_train_idc),3))
+        print("Test %male",round(base_df.loc[base_test_idc, 'gender'].sum()/ len(base_test_idc),3))
 
     if model == 'RFC':
         return run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, base_df, tgt_df)
@@ -118,6 +120,11 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
         base_features, target_features)
     print("Data shapes:", base_df.shape, target_df.shape)
 
+    # Experiment: only include Male/Female participants
+    if gender < 2:
+        base_df = base_df[base_df['gender']==gender]
+        target_df = target_df[target_df['gender']==gender]
+
     file_metrics, subject_metrics, base_metrics = [], [], []
     base_df_split = base_df.drop_duplicates(['subject_id'])
     base_df_split.loc[:,'ygender'] = base_df_split['y'].astype(str) + '_' + base_df_split['gender'].astype(str)
@@ -125,16 +132,17 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
     kf = StratifiedKFold(n_splits=k, shuffle=True)
     for i, (train_split_indices, test_split_indices) in enumerate(kf.split(base_df_split['subject_id'], base_df_split['ygender'])):
         print(f"Running {model} with data fold {i+1} of {k}")
-        df_copy = deepcopy(base_df)
+        base_df_copy = deepcopy(base_df)
+        target_df_copy = deepcopy(target_df)
 
         train_subjects = base_df_split.iloc[train_split_indices]['subject_id']
         test_subjects = base_df_split.iloc[test_split_indices]['subject_id']
-        train_indices = df_copy[df_copy['subject_id'].isin(train_subjects)].index.tolist()
-        test_indices = df_copy[df_copy['subject_id'].isin(test_subjects)].index.tolist()
+        train_indices = base_df_copy[base_df_copy['subject_id'].isin(train_subjects)].index.tolist()
+        test_indices = base_df_copy[base_df_copy['subject_id'].isin(test_subjects)].index.tolist()
 
-        scaler, df_copy = scale_features(df_copy, base_features, train_indices, test_indices)
+        scaler, base_df_copy = scale_features(base_df_copy, base_features, train_indices, test_indices)
 
-        file_metric, subject_metric, base_metric, n_tgt_train_samples = run_data_fold_tl(scaler, model, df_copy, base_features, train_indices, test_indices, target_df)
+        file_metric, subject_metric, base_metric, n_tgt_train_samples = run_data_fold_tl(scaler, model, base_df_copy, base_features, train_indices, test_indices, target_df_copy)
         file_metrics.append(file_metric)
         subject_metrics.append(subject_metric)
         base_metrics.append(base_metric)

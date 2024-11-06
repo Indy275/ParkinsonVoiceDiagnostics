@@ -1,9 +1,9 @@
 import random
+import pandas as pd
 import numpy as np
 import pandas as pd
 from copy import deepcopy
 import configparser
-from data_util import get_samples
 from sklearn.preprocessing import StandardScaler
 
 import torch
@@ -11,9 +11,10 @@ import torch.nn as nn
 from torch.utils.data import DataLoader, TensorDataset
 import torch.nn.functional as F
 import torch.optim as optim
-import matplotlib.pyplot as plt
 
 from eval import evaluate_predictions
+from data_util import get_samples
+
 
 config = configparser.ConfigParser()
 config.read('settings.ini')
@@ -83,7 +84,7 @@ def run_dnn_model(X_train, X_test, y_train, y_test, test_df):
     model, optimizer, criterion = create_dnn_model(n_features)
 
     train_dataset = TensorDataset(X_train, y_train)
-    train_loader = DataLoader(train_dataset, batch_size=5, shuffle=True)
+    train_loader = DataLoader(train_dataset)
 
     train_model(model, optimizer, criterion, train_loader)
 
@@ -99,41 +100,7 @@ def run_dnn_model(X_train, X_test, y_train, y_test, test_df):
     return file_scores, subj_scores
 
 
-def train_tl_batch_model(model, optimizer, criterion, base_loader, target_loader, num_epochs=10):
-    target_iter = iter(target_loader) if target_loader else None
-
-    for epoch in range(num_epochs):
-        model.train()
-        tgt_idx = 0
-        
-        for batch_idx, (batch_X, batch_y) in enumerate(base_loader):
-            if target_loader:
-                try:
-                    tgt_sample_X[tgt_idx]
-                except:
-                    try:
-                        tgt_sample_X, tgt_sample_y = next(target_iter)
-                        tgt_sample_X[tgt_idx]
-                    except:
-                        tgt_idx = 0
-                        target_iter = iter(target_loader)
-                        tgt_sample_X, tgt_sample_y = next(target_iter)
-                
-                batch_X[-1] = tgt_sample_X[tgt_idx] 
-                batch_y[-1] = tgt_sample_y[tgt_idx] 
-                tgt_idx += 1
-
-            optimizer.zero_grad()  # Reset gradients
-            outputs = model(batch_X)  # Get model predictions
-            loss = criterion(outputs, batch_y)  # Compute the loss
-            loss.backward()  # Compute gradients
-            optimizer.step()  # Update model weights
-
-        if print_intermediate:
-            print(f'Epoch [{epoch+1}/{num_epochs}]: Loss: {loss.item():.4f}')
-
-
-def train_tl_model(model, optimizer, criterion, base_loader, target_loader=None, num_epochs=10):
+def train_tl_model(model, optimizer, criterion, base_loader, num_epochs=10):
        for epoch in range(num_epochs):
         model.train()
         
@@ -144,7 +111,7 @@ def train_tl_model(model, optimizer, criterion, base_loader, target_loader=None,
             loss.backward()  # Compute gradients
             optimizer.step()  # Update model weights
 
-        if print_intermediate and epoch % (num_epochs-1) == 0:
+        if print_intermediate:# and epoch % (num_epochs-1) == 0:
             print(f'Epoch [{epoch+1}/{num_epochs}]: Loss: {loss.item():.4f}')
 
 
@@ -154,13 +121,12 @@ def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_tes
     base_X_train = torch.tensor(base_X_train).to(torch.float32)
     base_X_test = torch.tensor(base_X_test).to(torch.float32)
     base_y_train = torch.tensor(base_y_train)
-    base_y_test = base_y_test
     base_model, optimizer, criterion = create_dnn_model(n_features)
 
     base_dataset = TensorDataset(base_X_train, base_y_train)
     base_loader = DataLoader(base_dataset)#, batch_size=5, shuffle=True)
 
-    train_tl_model(base_model, optimizer, criterion, base_loader, target_loader=None)
+    train_tl_model(base_model, optimizer, criterion, base_loader)
 
     base_pos_subjs = list(base_df[base_df['y'] == 1]['subject_id'].unique())
     base_neg_subjs = list(base_df[base_df['y'] == 0]['subject_id'].unique())
@@ -168,7 +134,7 @@ def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_tes
     pos_subjs = list(tgt_df[tgt_df['y'] == 1]['subject_id'].unique())
     neg_subjs = list(tgt_df[tgt_df['y'] == 0]['subject_id'].unique())
     max_shot = min(len(pos_subjs), len(neg_subjs)) - 5
-    max_shot = 20
+    max_shot = 5
     
     metrics_list, metrics_grouped, base_metrics, n_tgt_train_samples = [], [], [], []
     seed = int(random.random()*10000)
@@ -180,28 +146,25 @@ def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_tes
 
         if n_shots > 0:
             # Fine-tune model with pos and neg samples from base and target set
-            # base_train_df, _ = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots/4)), base_df)
+            base_train_df, _ = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots/2)), base_df)
             tgt_train_df, tgt_test_df = get_samples(seed, pos_subjs, neg_subjs, n_shots, tgt_df)
 
             # Add target train data to scaler fit
             scaler_copy.partial_fit(tgt_train_df.iloc[:, :n_features].values) 
-
-            # Transform target train and test data
             tgt_train_df.iloc[:, :n_features] = scaler_copy.transform(tgt_train_df.iloc[:, :n_features].values)
             tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)
 
-            # tgt_train_df = pd.concat([tgt_train_df, base_train_df])
+            tgt_train_df = pd.concat([tgt_train_df, base_train_df])
 
             tgt_X_train = tgt_train_df.iloc[:, :n_features].values
             tgt_X_train = torch.tensor(tgt_X_train).to(torch.float32)
             tgt_y_train = torch.tensor(tgt_train_df['y'].values)
 
             tgt_dataset = TensorDataset(tgt_X_train, tgt_y_train)
-            tgt_loader = DataLoader(tgt_dataset)#, batch_size=5, shuffle=True)
+            tgt_loader = DataLoader(tgt_dataset)
 
-            # train_tl_batch_model(model, optimizer, criterion, base_loader, tgt_loader)
             train_tl_model(model, optimizer, criterion, tgt_loader, num_epochs=5)
-        elif n_shots == 0:
+        else: # n_shots == 0
             # Use entire tgt set for evaluation
             tgt_test_df = deepcopy(tgt_df)
             tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)

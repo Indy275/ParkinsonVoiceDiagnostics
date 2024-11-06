@@ -29,7 +29,7 @@ def get_scores(clf_name, y_test, preds):
 
 def evaluate_predictions(clf_name, tgt_y, tgt_df, base_y=None, base_preds=None):
     metrics = []
-    if print_intermediate:
+    if print_perf_results:
         print(f"Prediction scores for {clf_name}:")
     metrics.append(get_scores('Sample-level', tgt_y.tolist(), tgt_df['preds'].tolist()))
     
