@@ -43,12 +43,14 @@ def train_ptm(dataset):
     optimizer = optim.AdamW(model.parameters(), lr=0.0001)
     criterion = nn.CrossEntropyLoss()
     X, y, subj_id, sample_id, gender = [], [], [], [], []
+    audio_length = 100000
     for id, file in enumerate(files):
-        print("Processing file {} of {}".format(id, len(files)))
+        print("Processing file {} of {}".format(id+1, len(files)))
         path_to_file = os.path.join(dir, file) + '.wav'
         x, _ = librosa.core.load(path_to_file, sr=sr)
-        print(len(x))
-        x = x[:30000]
+        if len(x) < audio_length:
+            x = np.pad(x, int(np.ceil((audio_length - len(x))/2)))
+        x = x[:audio_length]
         features = processor(x, return_tensors="pt", sampling_rate=sr).input_values
         X.extend(features)
         y.extend([1 if file[:2] == 'PD' else 0] * features.shape[0])
@@ -67,13 +69,11 @@ def train_ptm(dataset):
     base_df = pd.DataFrame(data=data, columns=list(range(X.shape[1])) + ['y', 'subject_id', 'sample_id', 'gender'])
     
     n_features = X.shape[1]
-    train, test = get_samples(1, HC_id_list, PD_id_list, int(np.shape(base_df)[0]*0.5), base_df)
+    train, test = get_samples(1, HC_id_list, PD_id_list, int((len(HC_id_list)+len(PD_id_list))*0.25), base_df)
     base_X_train = train.loc[:, base_df.columns[:n_features]].values
     base_X_test = test.loc[:, base_df.columns[:n_features]].values
     base_y_train = train.loc[:, 'y'].values
     base_y_test = test.loc[:, 'y'].values
-    print(base_X_train.shape, base_X_test.shape)
-    print(base_X_train)
     base_X_train = base_X_train.astype(np.float32)
     base_y_train = base_y_train.astype(np.int32)
     base_X_test = base_X_test.astype(np.float32)
@@ -85,7 +85,7 @@ def train_ptm(dataset):
     train_dataset = TensorDataset(base_X_train, base_y_train)
     train_loader = DataLoader(train_dataset) 
 
-    num_epochs=2
+    num_epochs=10
     model.train()
     for param in model.parameters():
         param.requires_grad = False
@@ -97,8 +97,7 @@ def train_ptm(dataset):
         for batch_data, batch_labels in train_loader:
             optimizer.zero_grad()  # Reset gradients
             outputs = model(batch_data)
-            print(outputs, batch_labels)
-            hidden_states = outputs.last_hidden_state  # Get embeddings from last layer
+            hidden_states = outputs.last_hidden_state
             logits = model.classifier(hidden_states.mean(dim=1)) 
             loss = criterion(logits, batch_labels) 
             loss.backward()
@@ -109,10 +108,15 @@ def train_ptm(dataset):
     # Evaluation
     model.eval()
     with torch.no_grad():
-        base_preds = model(base_X_test)
-        _, base_predicted = torch.max(base_preds.data, 1)
-    test.loc[:, 'preds'] = base_predicted.numpy()
+        outputs = model(base_X_test)
+        print("base_preds",outputs)
+        hidden_states = outputs.last_hidden_state
+        logits = model.classifier(hidden_states.mean(dim=1)) 
+        print(logits)
+        logits = torch.argmax(logits, 1)
+        print(logits)
 
+    test.loc[:, 'preds'] = logits.numpy()
 
-    all_metrics = evaluate_predictions(f'PTM', base_y_test, test)
+    all_metrics = evaluate_predictions(f'PTM', test.loc[:, 'y'].values, test)
     

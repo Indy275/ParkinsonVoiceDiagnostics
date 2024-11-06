@@ -77,7 +77,6 @@ def run_ml_model(X_train, X_test, y_train, y_test, test_df):
 
 def run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df):
     n_features = np.shape(base_X_train)[1]
-    # base_clf = RandomForestClassifier()
     base_clf = SGDClassifier()
     base_clf.partial_fit(base_X_train, base_y_train, classes=np.unique(base_y_train))
 
@@ -90,10 +89,9 @@ def run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test
 
     metrics_list, metrics_grouped, n_tgt_train_samples, base_metrics = [], [], [], []
     seed = int(random.random()*10000)
-    for n_shots in range(max_shot+1):
+    for n_shots in range(1, max_shot+1):
         scaler_copy = deepcopy(scaler)
         clf = deepcopy(base_clf)  # Copy model trained on base language
-
         if n_shots > 0:
              # Fine-tune model with pos and neg samples from base and target set
             base_train_df, _ = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots/6)), base_df)

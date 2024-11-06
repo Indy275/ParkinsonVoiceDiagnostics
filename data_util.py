@@ -57,38 +57,3 @@ def get_samples(seed, pos_subjs, neg_subjs, n_shots, df):
     test_df = df[~df['subject_id'].isin(pos_train_samples + neg_train_samples)]
 
     return train_df, test_df
-
-
-
-################ NEXT BLOCK TAKEN FROM https://github.com/yhu01/BMS/blob/main/test_standard_bms.py
-def centerDatas(datas):
-    
-    datas = datas - datas.mean(1, keepdim=True)
-    return datas
-
-def scaleEachUnitaryDatas(datas):
-    
-    norms = datas.norm(dim=1, keepdim=True)
-    return datas/norms
-
-def QRreduction(datas):
-    ndatas = torch.linalg.qr(datas.permute(0,1)).R
-    ndatas = ndatas.permute(0,1)
-    return ndatas
-
-def transform_tl_features(data, preprocess='EME'):
-    for p in preprocess:
-        if p=='P':
-            # print("--- preprocess: Power transform")
-            data = torch.sqrt(data+1e-6)
-            
-        elif p=="M":
-            # print("--- preprocess: Mean subtraction")
-            data = centerDatas(data)
-            # print("--- preprocess: QR decomposition")
-            data = QRreduction(data)
-        elif p=="E":
-            # print("--- preprocess: Euclidean normalization")
-            data = scaleEachUnitaryDatas(data)
-
-    return data
