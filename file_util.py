@@ -4,10 +4,15 @@ import configparser
 
 config = configparser.ConfigParser()
 config.read('settings.ini')
-data_dir = config['DATA_SETTINGS']['data_dir']
 speech_task = config['DATA_SETTINGS']['speech_task']
 normalize_audio = config.getboolean('DATA_SETTINGS', 'normalize_audio')
 
+if os.getenv("COLAB_RELEASE_TAG"):  # colab
+    data_dir = '/content/drive/My Drive/RAIVD_data/'
+elif os.name == 'posix':  # linux
+    data_dir = '/home/indy/Documents/RAIVD_data/'
+elif os.name == 'nt':  # windows
+    data_dir = "C:\\Users\INDYD\Documents\RAIVD_data\\"
 
 
 def get_dirs(dataset):

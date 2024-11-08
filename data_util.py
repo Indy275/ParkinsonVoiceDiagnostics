@@ -1,16 +1,14 @@
 import random
-import numpy as np
 import pandas as pd
-from joblib import dump
-import configparser
 import os
 from sklearn.preprocessing import StandardScaler
-import torch
 
-config = configparser.ConfigParser()
-config.read('settings.ini')
-data_dir = config['DEFAULT']['data_dir']
-
+if os.getenv("COLAB_RELEASE_TAG"):  # colab
+    data_dir = '/content/drive/My Drive/RAIVD_data/'
+elif os.name == 'posix':  # linux
+    data_dir = '/home/indy/Documents/RAIVD_data/'
+elif os.name == 'nt':  # windows
+    data_dir = "C:\\Users\INDYD\Documents\RAIVD_data\\"
 
 def make_train_test_split(id_list, test_size=0.3, seed=1):
     """
