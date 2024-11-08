@@ -40,12 +40,13 @@ def train_ptm(dataset):
     genderinfo = pd.read_csv(os.path.join(parent_dir, 'gender.csv'), header=0)
     print(dir, store_location, files)
     model, processor = create_PTM()
-    optimizer = optim.AdamW(model.parameters(), lr=0.0001)
+    optimizer = optim.AdamW(model.parameters(), lr=0.00001)
     criterion = nn.CrossEntropyLoss()
     X, y, subj_id, sample_id, gender = [], [], [], [], []
-    audio_length = 100000
+    audio_length = 150000
     for id, file in enumerate(files):
-        print("Processing file {} of {}".format(id+1, len(files)))
+        if id % 10 == 0:
+            print("Processing file [{}/{}]".format(id+1, len(files)))
         path_to_file = os.path.join(dir, file) + '.wav'
         x, _ = librosa.core.load(path_to_file, sr=sr)
         if len(x) < audio_length:
@@ -69,31 +70,30 @@ def train_ptm(dataset):
     base_df = pd.DataFrame(data=data, columns=list(range(X.shape[1])) + ['y', 'subject_id', 'sample_id', 'gender'])
     
     n_features = X.shape[1]
-    train, test = get_samples(1, HC_id_list, PD_id_list, int((len(HC_id_list)+len(PD_id_list))*0.25), base_df)
+    train, test = get_samples(1, HC_id_list, PD_id_list, int((len(HC_id_list)+len(PD_id_list))*0.3), base_df)
     base_X_train = train.loc[:, base_df.columns[:n_features]].values
     base_X_test = test.loc[:, base_df.columns[:n_features]].values
     base_y_train = train.loc[:, 'y'].values
-    base_y_test = test.loc[:, 'y'].values
     base_X_train = base_X_train.astype(np.float32)
     base_y_train = base_y_train.astype(np.int32)
     base_X_test = base_X_test.astype(np.float32)
-
 
     base_X_train = torch.tensor(base_X_train).to(torch.float32)
     base_y_train = torch.tensor(np.squeeze(base_y_train)).type(torch.LongTensor)
     base_X_test = torch.tensor(base_X_test).to(torch.float32)
     train_dataset = TensorDataset(base_X_train, base_y_train)
-    train_loader = DataLoader(train_dataset) 
+    train_loader = DataLoader(train_dataset, shuffle=True) 
+
+    print("Data generated; now training the model")
 
     num_epochs=10
-    model.train()
     for param in model.parameters():
         param.requires_grad = False
-    for param in model.encoder.layers[-3:].parameters():  # Unfreeze last 3 transformer layers
+    for param in model.encoder.layers[-1:].parameters():  # Unfreeze last layer
         param.requires_grad = True
-
     # Training loop (simplified for one batch, repeat in an epoch loop for full training)
     for epoch in range(num_epochs):
+        model.train()   
         for batch_data, batch_labels in train_loader:
             optimizer.zero_grad()  # Reset gradients
             outputs = model(batch_data)
@@ -105,18 +105,23 @@ def train_ptm(dataset):
 
         print(f'Epoch [{epoch+1}/{num_epochs}]: Loss: {loss.item():.4f}')
 
-    # Evaluation
-    model.eval()
-    with torch.no_grad():
-        outputs = model(base_X_test)
-        print("base_preds",outputs)
-        hidden_states = outputs.last_hidden_state
-        logits = model.classifier(hidden_states.mean(dim=1)) 
-        print(logits)
-        logits = torch.argmax(logits, 1)
-        print(logits)
+        # Evaluation
+        model.eval()
+        with torch.no_grad():
+            outputs = model(base_X_test)
+            hidden_states = outputs.last_hidden_state
+            logits = model.classifier(hidden_states.mean(dim=1)) 
+            logits = torch.argmax(logits, 1)
+        test.loc[:, 'preds'] = logits.numpy()
 
-    test.loc[:, 'preds'] = logits.numpy()
+        metr = evaluate_predictions(f'PTM', test.loc[:, 'y'].values, test)
+        file_metrics, _ = zip(*metr)
+        print("Mean Acc:", round(sum(i[0] for i in file_metrics), 3))
+        print("Mean AUC:", round(sum(i[1] for i in file_metrics), 3))
+        print("Mean Sens:", round(sum(i[2] for i in file_metrics), 3))
+        print("Mean Spec:", round(sum(i[3] for i in file_metrics), 3))
 
-    all_metrics = evaluate_predictions(f'PTM', test.loc[:, 'y'].values, test)
+        fmetrics_df = pd.DataFrame(file_metrics, columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
+        fmetrics_df.to_csv(os.path.join('experiments', f'PTM_{dataset}.csv'), index=False)
+
     
