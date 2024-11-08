@@ -6,7 +6,6 @@ import pandas as pd
 import configparser
 import matplotlib.pyplot as plt
 
-# from skmultiflow.meta import AdaptiveRandomForestClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import SGDClassifier
 from sklearn.svm import SVC
@@ -21,48 +20,64 @@ print_intermediate = config.getboolean('OUTPUT_SETTINGS', 'print_intermediate')
 
 
 def run_ml_model(X_train, X_test, y_train, y_test, test_df):
-    # clf = RandomForestClassifier()
-    clf = SVC()
+    clf = SVC(kernel='linear')
+    clf = RandomForestClassifier()
+    
     clf.fit(X_train, y_train)
     preds = clf.predict(X_test)
     test_df['preds'] = preds
 
-    all_metrics = evaluate_predictions('RFC', y_test, test_df)
+    all_metrics = evaluate_predictions('SVM', y_test, test_df)
     file_scores, subj_scores = zip(*all_metrics)
 
     if plot_fimp:
-        fimp = sorted(zip(test_df.columns[:X_test.shape[1]], clf.feature_importances_), key=lambda l: l[1], reverse=True)
+        # fimp = sorted(zip(test_df.columns[:X_test.shape[1]], clf.feature_importances_), key=lambda l: l[1], reverse=True)
+        fimp = clf.feature_importances_
+        print(fimp)
+        # fimp = list(map(np.abs, clf.coef_[0]))
+
         # [6, 5, 6, 3, 156]
         fl = [0, 6, 11, 17, 20, 176]
-        f0_features = [str(x) for x in range(fl[0], fl[1])]
-        jitter_features = [str(x) for x in range(fl[1], fl[2])]
-        shimmer_features = [str(x) for x in range(fl[2], fl[3])]
-        formant_features = [str(x) for x in range(fl[3], fl[4])]
-        mfcc_features = [str(x) for x in range(fl[4], fl[5])]
+        f0_features = [x for x in range(fl[0], fl[1])]
+        jitter_features = [x for x in range(fl[1], fl[2])]
+        shimmer_features = [x for x in range(fl[2], fl[3])]
+        formant_features = [x for x in range(fl[3], fl[4])]
+        mfcc_features = [x for x in range(fl[4], fl[5])]
 
-        sum_f0 = sum(val for key, val in fimp if key in f0_features)
+        sum_f0, sum_jit, sum_shim, sum_form, sum_mfcc = 0, 0,0,0,0
+        for i, value in enumerate(fimp):
+            if i in f0_features:
+                sum_f0 += abs(value)
+            if i in jitter_features:
+                sum_jit += abs(value)
+            if i in shimmer_features:
+                sum_shim += abs(value)
+            if i in formant_features:
+                sum_form += abs(value)
+            if i in mfcc_features:
+                sum_mfcc += abs(value)
+
         print("Contribution of F0: {:.3f} (avg: {:.3f})".format(sum_f0, sum_f0/len(f0_features)))
-        
-        sum_jit = sum(val for key, val in fimp if key in jitter_features)
+        # sum_jit = sum(val for key, val in fimp if key in jitter_features)
         print("Contribution of Jitter: {:.3f} (avg: {:.3f})".format(sum_jit, sum_jit/len(jitter_features)))
-        sum_shim = sum(val for key, val in fimp if key in shimmer_features)
+        # sum_shim = sum(val for key, val in fimp if key in shimmer_features)
         print("Contribution of Shimmer: {:.3f} (avg: {:.3f})".format(sum_shim, sum_shim/len(shimmer_features)))
-        sum_form = sum(val for key, val in fimp if key in formant_features)
+        # sum_form = sum(val for key, val in fimp if key in formant_features)
         print("Contribution of formants: {:.3f} (avg: {:.3f})".format(sum_form, sum_form/len(formant_features)))
-        sum_mfcc = sum(val for key, val in fimp if key in mfcc_features)
+        # sum_mfcc = sum(val for key, val in fimp if key in mfcc_features)
         print("Contribution of MFCC: {:.3f} (avg: {:.3f})".format(sum_mfcc, sum_mfcc/len(mfcc_features)))
         print("Total feature importance (should equal to 1):", sum_mfcc + sum_f0 + sum_form + sum_jit + sum_shim)
 
-        plt.barh(test_df.columns[fl[0]:fl[1]], clf.feature_importances_[fl[0]:fl[1]], color='green')
-        plt.barh(test_df.columns[fl[1]:fl[2]], clf.feature_importances_[fl[1]:fl[2]], color='blue')
-        plt.barh(test_df.columns[fl[2]:fl[3]], clf.feature_importances_[fl[2]:fl[3]], color='red')
-        plt.barh(test_df.columns[fl[3]:fl[4]], clf.feature_importances_[fl[3]:fl[4]], color='purple')
-        # plt.barh(df.columns[fl[4]:fl[5]], clf.feature_importances_[fl[4]:fl[5]], color='orange')
+        plt.barh(test_df.columns[fl[0]:fl[1]], fimp[fl[0]:fl[1]], color='green')
+        plt.barh(test_df.columns[fl[1]:fl[2]], fimp[fl[1]:fl[2]], color='blue')
+        plt.barh(test_df.columns[fl[2]:fl[3]], fimp[fl[2]:fl[3]], color='red')
+        plt.barh(test_df.columns[fl[3]:fl[4]], fimp[fl[3]:fl[4]], color='purple')
+        # plt.barh(df.columns[fl[4]:fl[5]], fimp[fl[4]:fl[5]], color='orange')
 
-        plt.barh(test_df.columns[fl[4]:fl[4]+39], clf.feature_importances_[fl[4]:fl[4]+39], color='green')
-        plt.barh(test_df.columns[fl[4]+39:fl[4]+39+39], clf.feature_importances_[fl[4]+39:fl[4]+39+39], color='blue')
-        plt.barh(test_df.columns[fl[4]+39+39:fl[4]+78+39], clf.feature_importances_[fl[4]+39+39:fl[4]+78+39], color='red')
-        plt.barh(test_df.columns[fl[4]+78+39:fl[4]+78+78], clf.feature_importances_[fl[4]+78+39:fl[4]+78+78], color='orange')
+        plt.barh(test_df.columns[fl[4]:fl[4]+39], fimp[fl[4]:fl[4]+39], color='green')
+        plt.barh(test_df.columns[fl[4]+39:fl[4]+39+39], fimp[fl[4]+39:fl[4]+39+39], color='blue')
+        plt.barh(test_df.columns[fl[4]+39+39:fl[4]+78+39], fimp[fl[4]+39+39:fl[4]+78+39], color='red')
+        plt.barh(test_df.columns[fl[4]+78+39:fl[4]+78+78], fimp[fl[4]+78+39:fl[4]+78+78], color='orange')
 
         plt.yticks(
             [(fl[0] + fl[1]) / 2, (fl[1] + fl[2]) / 2, (fl[2] + fl[3]) / 2, (fl[3] + fl[4]) / 2, (fl[4] + fl[5]) / 2],
@@ -121,7 +136,7 @@ def run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test
         tgt_preds = clf.predict(tgt_X_test)
         tgt_test_df.loc[:, 'preds'] = tgt_preds
 
-        all_metrics = evaluate_predictions(f'RFC ({n_shots} shots)', tgt_y_test, tgt_test_df, base_y_test, base_preds)
+        all_metrics = evaluate_predictions(f'SVM ({n_shots} shots)', tgt_y_test, tgt_test_df, base_y_test, base_preds)
         metrics, grouped, base = zip(*all_metrics)
         metrics_list.append(metrics)
         metrics_grouped.append(grouped)

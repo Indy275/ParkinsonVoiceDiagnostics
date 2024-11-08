@@ -17,7 +17,7 @@ def save_intermediate_results(X, y, subj_id, sample_id, gender, ifm_nifm, store_
     df = pd.DataFrame(data=data, columns=list(range(X.shape[1])) + ['y', 'subject_id', 'sample_id', 'gender'])
     if ifm_nifm.startswith('nifm'):
         import get_nifm_features
-        df = get_nifm_features.reduce_dims(df, len(df.columns)-4)
+        df = get_nifm_features.aggregate_windows(df)
 
     df.to_csv(os.path.join(store_location[0], f"{store_location[1]}_{ifm_nifm}_{id}.csv"), index=False)
     print(f'Intermediate data saved to {store_location[0]}.')
@@ -42,6 +42,12 @@ def combine_dfs(store_location, ifm_nifm):
                                                                                   i == 1]),
                                                                              len([i for i in df['y'] if
                                                                                   i == 0])))
+    print("Identified {} files, of which {} M and {} F.".format(df.shape[0],
+                                                                             len([i for i in df['gender'] if
+                                                                                  i == 1]),
+                                                                             len([i for i in df['gender'] if
+                                                                                  i == 0])))
+    print(df.shape)
     
     # if ifm_nifm.startswith('nifm'):
     #     import get_nifm_features
@@ -65,7 +71,7 @@ def create_features(dataset, ifm_nifm):
     X, y, subj_id, sample_id, gender = [], [], [], [], []
 
     for id, file in enumerate(files):
-        print("Processing file {} of {}".format(id, len(files)))
+        print("Processing file [{}/{}]".format(id, len(files)))
         path_to_file = os.path.join(dir, file) + '.wav'
 
         if ifm_nifm.startswith('ifm'):

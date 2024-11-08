@@ -17,9 +17,11 @@ gender = config.getint('EXPERIMENT_SETTINGS', 'gender')
 
 pd.options.mode.chained_assignment = None  # default='warn'
 if clf == 'DNN':
-    from DNN_models import run_dnn_tl_model, run_dnn_model
-elif clf == 'RFC':
+    from DNN_models import run_dnn_model, run_dnn_tl_model
+elif clf == 'SVM':
     from ML_models import run_ml_model, run_ml_tl_model
+elif clf == 'PCA_PLDA':
+    from PCA_PLDA import run_PCA_PLDA
 
 
 cwd = os.path.abspath(os.getcwd())
@@ -29,6 +31,8 @@ if not os.path.exists(experiment_folder):
 
 
 def run_data_fold(model, df, n_features, train_indices, test_indices):
+    # feature_cols = df.columns[20:33]#[*df.columns[:20], *df.columns[33:n_features]]
+
     X_train = df.loc[train_indices, df.columns[:n_features]]
     X_test = df.loc[test_indices, df.columns[:n_features]]
     y_train = df.loc[train_indices, 'y']
@@ -45,10 +49,13 @@ def run_data_fold(model, df, n_features, train_indices, test_indices):
         print("Train %male",round(df.loc[train_indices, 'gender'].sum() / len(train_indices),3))
         print("Test %male",round(df.loc[test_indices, 'gender'].sum()/  len(test_indices),3))
 
-    if model == 'RFC':
+    if model == 'SVM':
         return run_ml_model(X_train, X_test, y_train, y_test, test_df)
     elif model == 'DNN':
         return run_dnn_model(X_train, X_test, y_train, y_test, test_df)
+    elif model == 'PCA_PLDA':
+        return run_PCA_PLDA(X_train, X_test, y_train, y_test, test_df)
+
 
 
 def run_monolingual(dataset, ifm_nifm, model, k=2):
@@ -63,9 +70,10 @@ def run_monolingual(dataset, ifm_nifm, model, k=2):
     split_df = df.drop_duplicates(['subject_id'])
     split_df.loc[:,'ygender'] = split_df['y'].astype(str) + '_' + split_df['gender'].astype(str)
 
+    print(f"Data loaded succesfully with shapes {df.shape}, now running {model} classifier")
     kf = StratifiedKFold(n_splits=k, shuffle=True)
     for i, (train_split_indices, test_split_indices) in enumerate(kf.split(split_df['subject_id'], split_df['ygender'])):
-        print(f"Running {model} with data fold {i+1} of {k}")
+        print(f"Data fold [{i+1}/{k}]")
         df_copy = deepcopy(df)
 
         train_subjects = split_df.iloc[train_split_indices]['subject_id']
@@ -105,9 +113,9 @@ def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_te
         print("Train %PD:",round(base_df.loc[base_train_idc, 'y'].sum()/ len(base_train_idc),3))
         print("Test %PD:",round(base_df.loc[base_test_idc, 'y'].sum()/ len(base_test_idc),3))
         print("Train %male",round(base_df.loc[base_train_idc, 'gender'].sum()/ len(base_train_idc),3))
-        print("Test %male",round(base_df.loc[base_test_idc, 'gender'].sum()/ len(base_test_idc),3))
+        print("Test %male",round(base_df.loc[base_test_idc, 'gender'].sum()/ len(base_test_idc),3)) 
 
-    if model == 'RFC':
+    if model == 'SVM':
         return run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, base_df, tgt_df)
     elif model == 'DNN':
         return run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
@@ -118,7 +126,6 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
     target_df, target_features = load_data(target_dataset, ifm_nifm)
     assert base_features == target_features, "Number of features across languages should be equal: {} and {}".format(
         base_features, target_features)
-    print("Data shapes:", base_df.shape, target_df.shape)
 
     # Experiment: only include Male/Female participants
     if gender < 2:
@@ -129,9 +136,10 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
     base_df_split = base_df.drop_duplicates(['subject_id'])
     base_df_split.loc[:,'ygender'] = base_df_split['y'].astype(str) + '_' + base_df_split['gender'].astype(str)
 
+    print(f"Data loaded succesfully with shapes {base_df.shape}, {target_df.shape}, now running {model} classifier")
     kf = StratifiedKFold(n_splits=k, shuffle=True)
     for i, (train_split_indices, test_split_indices) in enumerate(kf.split(base_df_split['subject_id'], base_df_split['ygender'])):
-        print(f"Running {model} with data fold {i+1} of {k}")
+        print(f"Fold [{i+1}/{k}]")
         base_df_copy = deepcopy(base_df)
         target_df_copy = deepcopy(target_df)
 

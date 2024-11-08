@@ -25,8 +25,6 @@ def get_scores(clf_name, y_test, preds):
         print(confusion_matrix(y_test, preds))
     # if plot_results:
     #     plot_confmat(confusion_matrix(y_test,preds))
-    print(y_test, preds)
-    
     return accuracy_score(y_test, preds), roc_auc_score(y_test, preds), recall_score(y_test, preds, pos_label=1), \
         recall_score(y_test, preds, pos_label=0)
 
