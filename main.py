@@ -12,8 +12,9 @@ kfolds = config.getint('EXPERIMENT_SETTINGS', 'kfolds')
 clf = config['MODEL_SETTINGS']['clf']
 
 recreate_features = config.getboolean('RUN_SETTINGS', 'recreate_features')
-run_models = config.getboolean('RUN_SETTINGS', 'run_models')
-run_tl_models = config.getboolean('RUN_SETTINGS', 'run_tl_models')
+run_monolingual = config.getboolean('RUN_SETTINGS', 'run_monolingual')
+run_crosslingual = config.getboolean('RUN_SETTINGS', 'run_crosslingual')
+run_pretrained = config.getboolean('RUN_SETTINGS', 'run_pretrained')
 
 plot_results = config.getboolean('OUTPUT_SETTINGS', 'plot_results')
 
@@ -29,28 +30,28 @@ if recreate_features:
     print(f"Creating {ifm_or_nifm} features for '{base_dataset}' dataset ")
     get_features.create_features(base_dataset, ifm_or_nifm)
 
-    if not target_dataset.startswith('pass') and run_tl_models:
+    if not target_dataset.startswith('pass') and run_crosslingual:
         print(f"Creating {ifm_or_nifm} features for '{target_dataset}' dataset ")
         get_features.create_features(target_dataset, ifm_or_nifm)
 
-if run_models:
+if run_monolingual:
     import run_experiments
     print(f"Now running the {ifm_or_nifm} {clf} model with {base_dataset} data ")
     run_experiments.run_monolingual(base_dataset, ifm_or_nifm, model=clf, k=kfolds)
 
-if run_tl_models:
+if run_crosslingual:
     import run_experiments
     print(f"Now running the {ifm_or_nifm} {clf} model with {base_dataset}-base and {target_dataset}-target data ")
     run_experiments.run_crosslingual(base_dataset, target_dataset, ifm_or_nifm, model=clf, k=kfolds)
 
 if plot_results:
-    if run_tl_models:
+    if run_crosslingual:
         from plotting import results_visualised
         results_visualised.plot_TL_performance(base_dataset, target_dataset)
-    if run_models:
+    if run_monolingual:
         #todo: monolingual plotting
         pass
 
-
-import pretrained_model
-pretrained_model.train_ptm(base_dataset)
+if run_pretrained:
+    import pretrained_model
+    pretrained_model.train_ptm(base_dataset)
