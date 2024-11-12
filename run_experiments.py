@@ -139,7 +139,7 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
     print(f"Data loaded succesfully with shapes {base_df.shape}, {target_df.shape}, now running {model} classifier")
     kf = StratifiedKFold(n_splits=k, shuffle=True)
     for i, (train_split_indices, test_split_indices) in enumerate(kf.split(base_df_split['subject_id'], base_df_split['ygender'])):
-        print(f"Fold [{i+1}/{k}]")
+        print(f"Running model with data fold [{i+1}/{k}]")
         base_df_copy = deepcopy(base_df)
         target_df_copy = deepcopy(target_df)
 

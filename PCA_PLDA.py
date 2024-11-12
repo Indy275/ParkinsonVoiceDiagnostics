@@ -125,8 +125,6 @@ class PCA_PLDA_EER_Classifier(BaseEstimator, ClassifierMixin):
         N = features_test.shape[0]
         scores = []
         for i in range(N):
-            # check if feat vect contains nan vals,
-            # set score as nan if yes
             if np.isnan(features_test[i,0]):
                 scores.append(np.nan)
             else:
@@ -148,10 +146,6 @@ class PCA_PLDA_EER_Classifier(BaseEstimator, ClassifierMixin):
                 predictions.append(1)
             else:
                 predictions.append(0)
-        
-        # test_pt = self.predict_scores(features_test)
-        # predictions = list(test_pt[0]<self.eer_threshold) # > threshold pred 0, < threshold then 1
-        # predictions = [int(x) for x in predictions]
         
         return predictions
     
