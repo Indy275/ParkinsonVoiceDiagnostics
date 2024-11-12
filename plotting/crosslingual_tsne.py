@@ -10,12 +10,12 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(parent_dir)
 from data_util import load_data
 
-import configparser
-
-config = configparser.ConfigParser()
-parent = os.path.dirname
-config.read(os.path.join(parent(parent(__file__)), 'settings.ini'))
-data_dir = config['DATA_SETTINGS']['data_dir']
+if os.getenv("COLAB_RELEASE_TAG"):  # colab
+    data_dir = '/content/drive/My Drive/RAIVD_data/'
+elif os.name == 'posix':  # linux
+    data_dir = '/home/indy/Documents/RAIVD_data/'
+elif os.name == 'nt':  # windows
+    data_dir = "C:\\Users\INDYD\Documents\RAIVD_data\\"
 
 dataset1 = 'PCGITA'  # NeuroVoz ItalianPD PCGITA
 dataset2 = 'NeuroVoz'
@@ -29,6 +29,9 @@ if speech_task == 'tdu':
 elif speech_task == 'ddk':
     dataset1 += 'ddk'
     dataset2 += 'ddk'
+
+# dataset1 += '_norm'
+# dataset2 += '_norm'
 
 df1, n_features = load_data(dataset1, ifm_or_nifm)
 df1['ID'] = dataset1

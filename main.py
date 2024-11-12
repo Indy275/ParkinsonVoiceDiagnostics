@@ -24,6 +24,9 @@ if speech_task == 'tdu':
 elif speech_task == 'ddk':
     base_dataset += 'ddk'
     target_dataset += 'ddk'
+elif speech_task == 'lr':
+    base_dataset += 'lr'
+    target_dataset += 'lr'
 
 if recreate_features:
     import get_features
@@ -36,12 +39,12 @@ if recreate_features:
 
 if run_monolingual:
     import run_experiments
-    print(f"Now running the {ifm_or_nifm} {clf} model with {base_dataset} data ")
+    print(f"Started execution of the {clf}-{ifm_or_nifm} model with {base_dataset} data ")
     run_experiments.run_monolingual(base_dataset, ifm_or_nifm, model=clf, k=kfolds)
 
 if run_crosslingual:
     import run_experiments
-    print(f"Now running the {ifm_or_nifm} {clf} model with {base_dataset}-base and {target_dataset}-target data ")
+    print(f"Started execution of the {clf}-{ifm_or_nifm} model with {base_dataset}-base and {target_dataset}-target data ")
     run_experiments.run_crosslingual(base_dataset, target_dataset, ifm_or_nifm, model=clf, k=kfolds)
 
 if plot_results:
@@ -54,4 +57,7 @@ if plot_results:
 
 if run_pretrained:
     import pretrained_model
-    pretrained_model.train_ptm(base_dataset)
+    pretrained_model.run_ptm(base_dataset)
+
+# from plotting import results_visualised
+# results_visualised.plot_TL_performance(base_dataset, target_dataset)

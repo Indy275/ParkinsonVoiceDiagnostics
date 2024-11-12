@@ -11,12 +11,12 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(parent_dir)
 from data_util import load_data
 
-import configparser
-
-config = configparser.ConfigParser()
-parent = os.path.dirname
-config.read(os.path.join(parent(parent(__file__)), 'settings.ini'))
-data_dir = config['DATA_SETTINGS']['data_dir']
+if os.getenv("COLAB_RELEASE_TAG"):  # colab
+    data_dir = '/content/drive/My Drive/RAIVD_data/'
+elif os.name == 'posix':  # linux
+    data_dir = '/home/indy/Documents/RAIVD_data/'
+elif os.name == 'nt':  # windows
+    data_dir = "C:\\Users\INDYD\Documents\RAIVD_data\\"
 
 dataset = 'NeuroVoz'  # NeuroVoz ItalianPD CzechPD test
 ifm_or_nifm = 'ifm'

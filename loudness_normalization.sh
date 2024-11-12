@@ -6,13 +6,13 @@
 # NeuroVoz tdu done
 # Neurovoz ddk done
 # Italian tdu done
-# Italian ddk
-# PCGITA tdu
-# PCGITA ddk
+# Italian ddk done
+# PCGITA tdu done
+# PCGITA ddk done
 
-in_dir=C:\\Users\\INDYD\\Documents\\RAIVD_data\\ItalianPD\\records_ddk\\
-temp_dir=C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\records_temp\\
-out_dir=C:\\Users\\INDYD\\Documents\\RAIVD_data\\ItalianPD\\records_ddk_norm\\
+in_dir=C:\\Users\\INDYD\\Documents\\RAIVD_data\\PCGITA\\records_tdu\\
+temp_dir=C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\records_temp\\ # Some random empty folder suffices; can be removed afterwards
+out_dir=C:\\Users\\INDYD\\Documents\\RAIVD_data\\PCGITA\\records_tdu_norm\\
 
 for audio_File in "$in_dir"/*
 do

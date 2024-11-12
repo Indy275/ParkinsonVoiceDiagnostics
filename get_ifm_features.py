@@ -40,6 +40,7 @@ def get_f0(sound):
 
     meandF0 = df0.mean()
     meanddF0 = ddf0.mean()
+    ['F0_mean', 'F0_std','F0_min', 'F0_std','F0_max', 'dF0_mean', 'ddF0_mean']
     measuresF0 = np.hstack((meanF0, stdevF0, minF0, maxF0, meandF0, meanddF0)).reshape((1, -1))
     return measuresF0
 
@@ -93,8 +94,8 @@ def measureFormants(sound, f0min, f0max):
 def get_mfcc(x):
     mfcc = librosa.feature.mfcc(y=x, sr=sr, n_mfcc=13, n_fft=frame_size,
                                 hop_length=frame_step)
-    mfccd = librosa.feature.delta(data=mfcc, order=1)
-    mfccdd = librosa.feature.delta(data=mfcc, order=2)
+    mfccd = librosa.feature.delta(data=mfcc, order=1, mode='nearest')
+    mfccdd = librosa.feature.delta(data=mfcc, order=2, mode='nearest')
     mfcc_matrix = np.vstack((mfcc, mfccd, mfccdd))
     mfcc = mfcc_matrix.T
     
@@ -104,6 +105,7 @@ def get_mfcc(x):
     kurt_mfcc = scipy.stats.kurtosis(mfcc, axis=0)
 
     mfcc = np.hstack((mean_mfcc, std_mfcc, skew_mfcc, kurt_mfcc)).reshape((1, -1))
+   
     return mfcc
 
 
