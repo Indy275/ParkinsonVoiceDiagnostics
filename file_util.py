@@ -41,6 +41,9 @@ def get_dirs(dataset):
     elif speech_task == 'ddk':
         dir = os.path.join(data_dir , folder, 'records_ddk')
         folder += 'ddk'
+    elif speech_task == 'lr':
+        dir = os.path.join(data_dir , folder, 'records_lr')
+        folder += 'lr'
     
     if normalize_audio:
         dir += '_norm'
@@ -59,9 +62,9 @@ def load_files(datadir):
         task = 'TDU'
     else:
         task = r'A\d'
-
+    
     for file in os.listdir(datadir):
-        if re.match(r".*^[A-Z]{2}_"+task+"_\d+$", file[:-4]):
+        # if re.match(r".*^[A-Z]{2}_"+task+"_\d+$", file[:-4]):
             files.append(file[:-4])
 
     HC_id_list = [f[-4:] for f in files if f[:2] == 'HC']

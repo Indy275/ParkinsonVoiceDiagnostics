@@ -1,6 +1,7 @@
 import random
 import pandas as pd
 import os
+import configparser
 from sklearn.preprocessing import StandardScaler
 
 if os.getenv("COLAB_RELEASE_TAG"):  # colab
@@ -9,6 +10,11 @@ elif os.name == 'posix':  # linux
     data_dir = '/home/indy/Documents/RAIVD_data/'
 elif os.name == 'nt':  # windows
     data_dir = "C:\\Users\INDYD\Documents\RAIVD_data\\"
+
+config = configparser.ConfigParser()
+config.read('settings.ini')
+speech_task = config['DATA_SETTINGS']['speech_task']
+normalize_audio = config.getboolean('DATA_SETTINGS', 'normalize_audio')
 
 def make_train_test_split(id_list, test_size=0.3, seed=1):
     """
@@ -22,7 +28,8 @@ def make_train_test_split(id_list, test_size=0.3, seed=1):
 
 
 def load_data(dataset, ifm_nifm):
-    df = pd.read_csv(os.path.join(data_dir, 'preprocessed_data',f'{dataset}_{ifm_nifm}.csv'), header=0)
+    norm = '_norm' if normalize_audio else ''
+    df = pd.read_csv(os.path.join(data_dir, 'preprocessed_data',f'{dataset}{norm}_{ifm_nifm}.csv'), header=0)
     n_features = len(df.columns) - 4  # Ugly coding, but does the trick: all columns except last 4 are features
     return df, n_features
 
@@ -40,8 +47,6 @@ def scale_features(df, n_features, train_indices, test_indices):
     df.loc[train_indices, df.columns[:n_features]] = X_train_scaled
     df.loc[test_indices, df.columns[:n_features]] = X_test_scaled
 
-    # dump(scaler, 'scaler.pkl')
-    
     return scaler, df
 
 

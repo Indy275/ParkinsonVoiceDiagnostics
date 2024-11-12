@@ -16,38 +16,6 @@ elif os.name == 'nt':  # windows
 
 ############################### NeuroVoz ###############################
 
-def rename_neurovoz_ddk():
-    dir = data_dir + "NeuroVoz\\DDK\\"
-    modified_dir = data_dir + "NeuroVoz\\records_ddk\\"
-    files = []
-    for file in os.listdir(dir):
-        files.append(file[:-4])
-        output_fname = os.path.join(modified_dir, f"{file[:2]}_DDK_{file[-8:-4]}.wav")
-        shutil.copy(os.path.join(dir, file), os.path.join(modified_dir, output_fname))
-    print(len(files))
-
-def rename_neurovoz_files():
-    dir = data_dir + "NeuroVoz\\audios\\"
-    modified_dir = data_dir + "NeuroVoz\\audios_A\\"
-    files = []
-    for file in os.listdir(dir):
-        if re.match(r"^[A-Z]{2}_A\d_\d+$", file[:-4]):
-            print("matched:", file)
-            files.append(file[:-4])
-            shutil.copy(os.path.join(dir, file), os.path.join(modified_dir, file))
-    print(len(files))
-
-def rename_neurovoz_files_tdu():
-    dir = data_dir + "NeuroVoz\\audios\\"
-    modified_dir = data_dir + "NeuroVoz\\records_tdu\\"
-    subj_files = defaultdict(list)
-    for file in os.listdir(dir):
-        fname = file[:-4]
-        if len(fname) > 10:  # Match all files except sustained vowel task
-            if fname[0:2] in ['HC', 'PD']:
-                subject_id = fname[0:2] + fname[-4:]
-                subj_files[subject_id].append(fname)
-
 def neurovoz_sex():
     dir = data_dir + "NeuroVoz\\metadata\\"
     hc = pd.read_csv(dir + 'data_hc.csv', index_col=None, header=0)
@@ -95,14 +63,12 @@ def concat_files(subj_files, new_name, new_dir):
         output_fname = os.path.join(new_dir, f"{subj_id[:2]}_{new_name}_{subj_id[2:]}")
         concat_audio.export(output_fname+'.wav', format='wav')
 
-
 def rename_neurovoz_files():
     modified_dir = data_dir + "NeuroVoz\\records"
     new_dirs = [modified_dir+"\\", modified_dir+"_ddk\\", modified_dir+"_tdu\\"]
     subj_files_a, subj_files_ddk, subj_files_tdu = get_files_per_task()
     for files, name, dir in zip([subj_files_a, subj_files_ddk, subj_files_tdu], ['A1', 'DDK', 'TDU'], new_dirs):
         concat_files(files, name, dir)
-
 
 ############################### PC-GITA ###############################
 
@@ -119,9 +85,6 @@ def rename_pcgita_files():
                 subject_id = 'PD_{:04d}'.format([int(s) for s in re.findall(r'\d+', file)][0])
             f_path = os.path.join(subdir, file)
             subj_files[subject_id].append(f_path)
-    # print(len(subj_files))
-    # for k, v in subj_files.items():
-    #     print(k, len(v))
 
     for subj_id, files in subj_files.items():
         concat_audio = None
@@ -169,9 +132,7 @@ def rename_czech_files():
             shutil.copy(os.path.join(dir, file), os.path.join(modified_dir, new_fname))
 
 
-
 ############################### IPVS ###############################
-
 
 def get_gender(string):
     match = re.search(r'[a-zA-Z](?=[^a-zA-Z]*$)', string).group(0)
@@ -239,9 +200,8 @@ def rename_italian_files():
     df['ID'] = df['ID'].str[2:]
     df.to_csv(data_dir + 'ItalianPD\\gender.csv', index=False)
 
-rename_italian_files()
-############################### Other functions ###############################
 
+############################### Other functions ###############################
 
 def downsample(dataset, target_sample_rate=16000):
     modified_dir = data_dir + dataset
@@ -276,8 +236,8 @@ def modify_orig_id(row):
 
 def combine_rows():
     store_location = os.path.join(data_dir, 'preprocessed_data')
-    df = pd.read_csv(os.path.join(store_location, 'ItalianPDtdu_ifm.csv'))
-    df2 = pd.read_csv(os.path.join(store_location, 'NeuroVoztdu_ifm.csv'))
+    df = pd.read_csv(os.path.join(store_location, 'ItalianPDddk_norm_ifm.csv'))
+    df2 = pd.read_csv(os.path.join(store_location, 'NeuroVozddk_norm_ifm.csv'))
     # df3 = pd.read_csv(os.path.join(store_location, 'PCGITAtdu_ifm.csv'))
 
     df2['subject_id'] = df2.apply(lambda x: int(x['subject_id']) + 200, axis=1)
@@ -288,7 +248,7 @@ def combine_rows():
 
     df_all = pd.concat([df, df2])#, df3])
     print(df_all.columns, df_all.shape)
-    df_all.to_csv(os.path.join(store_location,'ItalianPDNeuroVoztdu_ifm.csv'), index=False)
+    df_all.to_csv(os.path.join(store_location,'ItalianPDNeuroVozddk_norm_ifm.csv'), index=False)
 
 
 def combine_columns():
