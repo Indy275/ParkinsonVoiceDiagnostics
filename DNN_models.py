@@ -45,7 +45,7 @@ class CNNModel(nn.Module):
         self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
         
         # Fully connected layers with dropout
-        self.fc1 = nn.Linear(in_features=6720, out_features=512)
+        self.fc1 = nn.Linear(in_features=1792, out_features=512)
         self.dropout5 = nn.Dropout(p=0.5)
         
         self.fc2 = nn.Linear(in_features=512, out_features=64)
@@ -140,18 +140,18 @@ def create_dnn_model(n_features):
 
 def create_cnn_model():
     model = CNNModel()
-    optimizer = optim.AdamW(model.parameters(), lr=0.001, weight_decay=1e-4)
+    optimizer = optim.AdamW(model.parameters(), lr=0.0005, weight_decay=1e-4)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.6)
     criterion = nn.CrossEntropyLoss()
     return model, optimizer, scheduler, criterion
 
-def train_model(model, optimizer, scheduler, criterion, train_loader, num_epochs=5):
+def train_model(model, optimizer, scheduler, criterion, train_loader, num_epochs=10):
     for epoch in range(num_epochs):
         model.train()
         
         for batch_data, batch_labels in train_loader:
             optimizer.zero_grad()  # Reset gradients
-            outputs = model(batch_data.unsqueeze(1))  # Get model predictions
+            outputs = model(batch_data)  # Get model predictions
             loss = criterion(outputs, batch_labels)  # Compute the loss
             # print(outputs, batch_labels, loss)
             loss.backward()  # Compute gradients
@@ -163,13 +163,16 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, num_epochs
 
 
 def run_dnn_model(modeltype, X_train, X_test, y_train, y_test, test_df):
-    n_features = X_train.shape[1]
+    n_features = X_train.shape[-1]
 
     X_train = torch.tensor(X_train).to(torch.float32)
     X_test = torch.tensor(X_test).to(torch.float32)
     y_train = torch.tensor(y_train)
+
     if modeltype.startswith('DNNC'):
         model, optimizer, scheduler, criterion = create_cnn_model()
+        X_train.unsqueeze(1)
+        X_test.unsqueeze(1)
     else:
         model, optimizer, scheduler, criterion = create_dnn_model(n_features)
 
@@ -180,10 +183,9 @@ def run_dnn_model(modeltype, X_train, X_test, y_train, y_test, test_df):
 
     model.eval()
     with torch.no_grad():
-        predictions = model(X_test.unsqueeze(1))
+        predictions = model(X_test)
         _, predicted = torch.max(predictions.data, 1)
-    print(predicted.numpy(), y_test)
-    test_df['preds'] = predicted.numpy()
+    test_df.loc[:, 'preds'] = predicted.numpy()
 
     all_metrics = evaluate_predictions('DNN', y_test, test_df)
     file_scores, subj_scores = zip(*all_metrics)
@@ -191,10 +193,10 @@ def run_dnn_model(modeltype, X_train, X_test, y_train, y_test, test_df):
     return file_scores, subj_scores
 
 
-def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df):
-    n_features = base_X_train.shape[1]
+def run_dnn_tl_model(scaler, modeltype, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df):
+    n_features = base_X_train.shape[-1]
 
-    if model.startswith('DNNC'):
+    if modeltype.startswith('DNNC'):
         base_model, optimizer, scheduler, criterion = create_cnn_model()
     else:
         base_model, optimizer, scheduler, criterion = create_dnn_model(n_features)
@@ -219,7 +221,7 @@ def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_tes
         tgt_df_copy = deepcopy(tgt_df)
         model = deepcopy(base_model)
         model.load_state_dict(base_model.state_dict())
-        optimizer = optim.AdamW(model.parameters(), lr=0.0002)
+        optimizer = optim.AdamW(model.parameters(), lr=0.0005)
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
         
         train_subjects = tgt_df_split.iloc[train_split_indices]['subject_id']
@@ -227,7 +229,6 @@ def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_tes
         train_indices = tgt_df_copy[tgt_df_copy['subject_id'].isin(train_subjects)].index.tolist()
         test_indices = tgt_df_copy[tgt_df_copy['subject_id'].isin(test_subjects)].index.tolist()
 
-        print(train_indices, test_indices)
         # Add target train data to scaler fit
         scaler_copy.partial_fit(tgt_df_copy.iloc[train_indices, :n_features].values) 
         tgt_df_copy.iloc[train_indices, :n_features] = scaler_copy.transform(tgt_df_copy.iloc[train_indices, :n_features].values)
@@ -235,28 +236,30 @@ def run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_tes
 
         # tgt_train_df = pd.concat([tgt_train_df, base_train_df])
 
-        tgt_X_train = tgt_df_copy.iloc[train_indices, :n_features].values
-        tgt_X_train = torch.tensor(tgt_X_train).to(torch.float32)
-        tgt_y_train = torch.tensor(tgt_df_copy.iloc[train_indices]['y'].values)
+        tgt_train_grouped = base_df.iloc[train_indices, :].groupby('sample_id')
+        tgt_X_train = torch.tensor(np.array([group.values for _, group in tgt_train_grouped])[:, :, :n_features]).to(torch.float32)
+        tgt_y_train = torch.tensor(tgt_train_grouped['y'].first().values)
+
+        tgt_test_grouped = base_df.iloc[test_indices, :].groupby('sample_id')
+        tgt_X_test = torch.tensor(np.array([group.values for _, group in tgt_test_grouped])[:, :, :n_features]).to(torch.float32)
+        tgt_y_test = tgt_test_grouped['y'].first().values
+        tgt_test_df= tgt_test_grouped.first()
 
         tgt_dataset = TensorDataset(tgt_X_train, tgt_y_train)
         tgt_loader = DataLoader(tgt_dataset, shuffle=True)
 
         train_model(model, optimizer, scheduler, criterion, tgt_loader, num_epochs=3)
 
-        tgt_X_test = tgt_df_copy.iloc[test_indices, :n_features].values
-        tgt_X_test = torch.tensor(tgt_X_test).to(torch.float32)
-        tgt_y_test = tgt_df_copy.iloc[test_indices]['y']
-
         model.eval()
         with torch.no_grad():
-            base_preds = model(base_X_test)
-            tgt_preds = model(tgt_X_test)
+            base_preds = model(base_X_test.unsqueeze(1))
+            tgt_preds = model(tgt_X_test.unsqueeze(1))
             _, base_predicted = torch.max(base_preds.data, 1)
             _, tgt_predicted = torch.max(tgt_preds.data, 1)
-        tgt_df_copy.loc[test_indices, 'preds'] = tgt_predicted.numpy()
+        
+        tgt_test_df.loc[:, 'preds'] = tgt_predicted.numpy()
 
-        all_metrics = evaluate_predictions(f'DNN TL', tgt_y_test, tgt_df_copy.iloc[test_indices, :], base_y_test, base_predicted.numpy())
+        all_metrics = evaluate_predictions(f'DNN_TL', tgt_y_test, tgt_test_df, base_y_test, base_predicted.numpy())
         
         metrics, grouped, base = zip(*all_metrics)
         metrics_list.append(metrics)

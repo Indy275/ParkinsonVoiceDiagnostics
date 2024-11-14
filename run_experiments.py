@@ -32,23 +32,25 @@ if not os.path.exists(experiment_folder):
 
 def run_data_fold(model, df, n_features, train_indices, test_indices):
     # feature_cols = df.columns[20:33]#[*df.columns[:20], *df.columns[33:n_features]]
-    train_grouped = df.iloc[train_indices, :].groupby('sample_id')
-    
-    X_train = np.array([group.values for _, group in train_grouped])
-    X_train = X_train[:, :, :n_features]
-    y_train = train_grouped['y'].first().values
-    
-    test_grouped = df.iloc[test_indices, :].groupby('sample_id')
-    X_test = np.array([group.values for _, group in test_grouped])
-    X_test = X_test[:, :, :n_features]
-    y_test = test_grouped['y'].first().values
-    test_df = test_grouped.first()
+    if model.startswith('DNNC'):
+        train_grouped = df.iloc[train_indices, :].groupby('sample_id')
 
-    # X_train = df.loc[train_indices, df.columns[:n_features]].values
-    # X_test = df.loc[test_indices, df.columns[:n_features]].values
-    # y_train = df.loc[train_indices, 'y'].values
-    # y_test = df.loc[test_indices, 'y'].values
+        X_train = np.array([group.values for _, group in train_grouped])
+        X_train = X_train[:, :, :n_features]
 
+        y_train = train_grouped['y'].first().values
+        
+        test_grouped = df.iloc[test_indices, :].groupby('sample_id')
+        X_test = np.array([group.values for _, group in test_grouped])
+        X_test = X_test[:, :, :n_features]
+        y_test = test_grouped['y'].first().values
+        test_df = test_grouped.first()
+    else:
+        X_train = df.loc[train_indices, df.columns[:n_features]].values
+        X_test = df.loc[test_indices, df.columns[:n_features]].values
+        y_train = df.loc[train_indices, 'y'].values
+        y_test = df.loc[test_indices, 'y'].values
+        test_df = df.loc[test_indices, :]
 
     if print_intermediate:
         print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
@@ -70,7 +72,6 @@ def run_data_fold(model, df, n_features, train_indices, test_indices):
 
 def run_monolingual(dataset, ifm_nifm, model, k=2):
     df, n_features = load_data(dataset, ifm_nifm)
-    print("Data shape:", df.shape)
 
     # Experiment: only include Male/Female participants
     if gender < 2:
@@ -112,12 +113,12 @@ def run_monolingual(dataset, ifm_nifm, model, k=2):
 
 def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_test_idc, tgt_df):
     base_train_grouped = base_df.iloc[base_train_idc, :].groupby('sample_id')
-    base_X_train = np.array([group[:n_features].values for _, group in base_train_grouped])
-    base_y_train = np.array([group['y'].values for _, group in base_train_grouped])
+    base_X_train = np.array([group.values for _, group in base_train_grouped])[:, :, :n_features]
+    base_y_train = base_train_grouped['y'].first().values
 
     base_test_grouped = base_df.iloc[base_test_idc, :].groupby('sample_id')
-    base_X_test = np.array([group[:n_features].values for _, group in base_test_grouped])
-    base_y_test = np.array([group['y'].values for _, group in base_train_grouped])
+    base_X_test = np.array([group.values for _, group in base_test_grouped])[:, :, :n_features]
+    base_y_test = base_test_grouped['y'].first().values
 
     # base_X_train = base_df.loc[base_train_idc, base_df.columns[:n_features]].values
     # base_X_test = base_df.loc[base_test_idc, base_df.columns[:n_features]].values
@@ -139,7 +140,7 @@ def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_te
     elif model == 'DNNTL':
         return run_dnn_fstl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
     elif model.startswith('DNN'):
-        return run_dnn_tl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
+        return run_dnn_tl_model(scaler, model, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
     
 
 def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
@@ -182,6 +183,8 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
         base_metrics.append(base_metric)
     print(np.shape(file_metrics))
     print(file_metrics)
+
+    print(np.mean(np.mean(file_metrics, axis=0), axis=0))
 
 
     fmetrics_df = pd.DataFrame(np.mean(file_metrics, axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])

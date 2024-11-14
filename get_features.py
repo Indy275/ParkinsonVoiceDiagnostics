@@ -102,4 +102,3 @@ def create_features(dataset, ifm_nifm):
             save_intermediate_results(X, y, subj_id, sample_id, gender, ifm_nifm, store_location, id)
 
     combine_dfs(store_location, ifm_nifm)
-    print(f'Data saved to {store_location}.')
