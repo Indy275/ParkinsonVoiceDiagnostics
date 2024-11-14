@@ -4,7 +4,26 @@ import numpy as np
 import pandas as pd
 import scipy.stats as ss
 from sklearn.decomposition import PCA
+import soundfile as sf
+import tempfile
 from transformers import AutoProcessor, HubertModel
+
+model = torch.hub.load('harritaylor/torchvggish', 'vggish')
+model.eval()
+
+def get_features_vggish(audio_path):
+    global model
+    def preprocess_audio(audio_path):
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav_file:
+                wav_path = temp_wav_file.name  # Get the temporary file path
+                y, sr = sf.read(audio_path)  # Read MP3 using soundfile
+                sf.write(wav_path, y, sr, format='wav')  # Write to temporary WAV file
+        return wav_path
+
+    wav_path = preprocess_audio(audio_path)
+    embeddings = model.forward(wav_path)
+    return embeddings.detach().numpy()[:10, :]
+
 
 def get_features(path_to_file):
     processor = AutoProcessor.from_pretrained("facebook/hubert-large-ls960-ft")
