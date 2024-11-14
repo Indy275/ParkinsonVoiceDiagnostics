@@ -61,6 +61,7 @@ def combine_dfs(store_location, ifm_nifm):
     #     df = get_nifm_features.aggregate_windows(df)
 
     df.to_csv(os.path.join(store_location[0], f"{store_location[1]}_{ifm_nifm}.csv"), index=False)
+    print("Combined dataframe is saved to",os.path.join(store_location[0], f"{store_location[1]}_{ifm_nifm}.csv"))
 
 
 def create_features(dataset, ifm_nifm):
@@ -76,7 +77,7 @@ def create_features(dataset, ifm_nifm):
     X, y, subj_id, sample_id, gender = [], [], [], [], []
 
     for id, file in enumerate(files):
-        print("Processing file [{}/{}]".format(id, len(files)))
+        print("Processing file [{}/{}]".format(id+1, len(files)))
         path_to_file = os.path.join(dir, file) + '.wav'
 
         if ifm_nifm.startswith('ifm'):
@@ -85,13 +86,15 @@ def create_features(dataset, ifm_nifm):
         elif ifm_nifm.startswith('nifm'):
             import get_nifm_features
             features = get_nifm_features.get_features(path_to_file)
+        elif ifm_nifm.startswith('spec'):
+            import get_ifm_features
+            features = get_ifm_features.get_spectrograms(path_to_file)
     
         X.extend(features)
         y.extend([1 if file[:2] == 'PD' else 0] * features.shape[0])
         subj_id.extend([file[-4:]] * features.shape[0])
         sample_id.extend([id] * features.shape[0])
         gender.extend([genderinfo.loc[genderinfo['ID']==int(file[-4:]), 'Sex'].item()] * features.shape[0])
-
         if id % 20 == 0 and id > 0:
             save_intermediate_results(X, y, subj_id, sample_id, gender, ifm_nifm, store_location, id)
             X, y, subj_id, sample_id, gender = [], [], [], [], []  # Start with fresh variables
