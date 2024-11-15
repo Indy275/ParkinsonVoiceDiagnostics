@@ -135,9 +135,9 @@ def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_te
 
     if model == 'SVM':
         return run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, base_df, tgt_df)
-    if model == 'SVMTL':
+    if model == 'SVMFSTL':
         return run_ml_fstl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, base_df, tgt_df)
-    elif model == 'DNNTL':
+    elif model == 'DNNFSTL':
         return run_dnn_fstl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
     elif model.startswith('DNN'):
         return run_dnn_tl_model(scaler, model, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
@@ -173,22 +173,19 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
         scaler, base_df_copy = scale_features(base_df_copy, base_features, train_indices, test_indices)
 
         metrics = run_data_fold_tl(scaler, model, base_df_copy, base_features, train_indices, test_indices, target_df_copy)
-        print(np.shape(metrics))
-        print(np.shape(metrics[0]))
 
-        if model.endswith('TL'):
-            file_metric, subject_metric, base_metric, n_tgt_train_samples = zip(*metrics)
+        if model.endswith('FSTL'):
+            file_metric = metrics[0]
+            subject_metric = metrics[1]
+            base_metric = metrics[2]
+            n_tgt_train_samples = metrics[3]
+            # file_metric, subject_metric, base_metric, n_tgt_train_samples = zip(*metrics)
         else:
             file_metric, subject_metric, base_metric = zip(*metrics)
 
         file_metrics.append(file_metric)
         subject_metrics.append(subject_metric)
         base_metrics.append(base_metric)
-    print(np.shape(file_metrics))
-    print(file_metrics)
-
-    print(np.mean(np.mean(file_metrics, axis=0), axis=0))
-
 
     fmetrics_df = pd.DataFrame(np.mean(file_metrics, axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
     fmetrics_df['Iteration'] = n_tgt_train_samples
