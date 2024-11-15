@@ -92,7 +92,7 @@ def create_features(dataset, ifm_nifm):
         elif ifm_nifm.startswith('spec'):
             import get_ifm_features
             features = get_ifm_features.get_spectrograms(path_to_file)
-        print(np.shape(features))
+            
         X.extend(features)
         y.extend([1 if file[:2] == 'PD' else 0] * features.shape[0])
         subj_id.extend([file[-4:]] * features.shape[0])

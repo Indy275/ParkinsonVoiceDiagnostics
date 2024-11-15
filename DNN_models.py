@@ -45,42 +45,42 @@ class CNNModel(nn.Module):
         self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
         
         # Fully connected layers with dropout
-        self.fc1 = nn.Linear(in_features=1792, out_features=512)
+        self.fc1 = nn.Linear(in_features=31, out_features=64)
         self.dropout5 = nn.Dropout(p=0.5)
         
-        self.fc2 = nn.Linear(in_features=512, out_features=64)
+        self.fc2 = nn.Linear(in_features=64, out_features=32)
         self.dropout6 = nn.Dropout(p=0.5)
         
-        self.fc3 = nn.Linear(in_features=64, out_features=2)
+        self.fc3 = nn.Linear(in_features=32, out_features=2)
         
     def forward(self, x):
         # Pass input through convolutional layers with dropout and pooling
-        # print(x.shape)
+        print(x.shape)
         x = self.pool1(F.relu(self.dropout1(self.conv1(x))))
-        # print(x.shape)
+        print(x.shape)
 
         x = self.pool2(F.relu(self.dropout2(self.conv2(x))))
         # print(x.shape)
 
-        x = self.pool3(F.relu(self.dropout3(self.conv3(x))))
+        # x = self.pool3(F.relu(self.dropout3(self.conv3(x))))
         # print(x.shape)
 
-        x = self.pool4(F.relu(self.dropout4(self.conv4(x))))
-        # print(x.shape, "After Conv blocks")
+        # x = self.pool4(F.relu(self.dropout4(self.conv4(x))))
+        print(x.shape, "After Conv blocks")
         # Flatten the tensor for the fully connected layers
         x = x.view(x.size(0), -1)
-        # print(x.shape, "After flattening")
+        print(x.shape, "After flattening")
         
         # Pass through fully connected layers with dropout
         x = F.relu(self.dropout5(self.fc1(x)))
-        # print(x.shape, "Lin1")
+        print(x.shape, "Lin1")
 
         x = F.relu(self.dropout6(self.fc2(x)))
-        # print(x.shape)
+        print(x.shape)
 
         x = self.fc3(x)
         x = torch.sigmoid(x)
-        # print(x.shape, "Output shape")
+        print(x.shape, "Output shape")
         
         return x
     
@@ -152,6 +152,7 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, num_epochs
         for batch_data, batch_labels in train_loader:
             optimizer.zero_grad()  # Reset gradients
             outputs = model(batch_data)  # Get model predictions
+            print(batch_data.shape, outputs.shape, batch_labels.shape)
             loss = criterion(outputs, batch_labels)  # Compute the loss
             # print(outputs, batch_labels, loss)
             loss.backward()  # Compute gradients

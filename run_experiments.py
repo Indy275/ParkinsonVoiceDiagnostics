@@ -18,8 +18,8 @@ gender = config.getint('EXPERIMENT_SETTINGS', 'gender')
 pd.options.mode.chained_assignment = None  # default='warn'
 if clf.startswith('DNN'):
     from DNN_models import run_dnn_model, run_dnn_tl_model, run_dnn_fstl_model
-elif clf == 'SVM':
-    from ML_models import run_ml_model, run_ml_tl_model
+elif clf.startswith('SVM'):
+    from ML_models import run_ml_model, run_ml_tl_model, run_ml_fstl_model
 elif clf == 'PCA_PLDA':
     from PCA_PLDA import run_PCA_PLDA
 
@@ -34,15 +34,11 @@ def run_data_fold(model, df, n_features, train_indices, test_indices):
     # feature_cols = df.columns[20:33]#[*df.columns[:20], *df.columns[33:n_features]]
     if model.startswith('DNNC'):
         train_grouped = df.iloc[train_indices, :].groupby('sample_id')
-
-        X_train = np.array([group.values for _, group in train_grouped])
-        X_train = X_train[:, :, :n_features]
-
+        X_train = np.array([group.values for _, group in train_grouped])[:, :, :n_features]
         y_train = train_grouped['y'].first().values
         
         test_grouped = df.iloc[test_indices, :].groupby('sample_id')
-        X_test = np.array([group.values for _, group in test_grouped])
-        X_test = X_test[:, :, :n_features]
+        X_test = np.array([group.values for _, group in test_grouped])[:, :, :n_features]
         y_test = test_grouped['y'].first().values
         test_df = test_grouped.first()
     else:
@@ -112,18 +108,20 @@ def run_monolingual(dataset, ifm_nifm, model, k=2):
 
 
 def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_test_idc, tgt_df):
-    base_train_grouped = base_df.iloc[base_train_idc, :].groupby('sample_id')
-    base_X_train = np.array([group.values for _, group in base_train_grouped])[:, :, :n_features]
-    base_y_train = base_train_grouped['y'].first().values
-
-    base_test_grouped = base_df.iloc[base_test_idc, :].groupby('sample_id')
-    base_X_test = np.array([group.values for _, group in base_test_grouped])[:, :, :n_features]
-    base_y_test = base_test_grouped['y'].first().values
-
-    # base_X_train = base_df.loc[base_train_idc, base_df.columns[:n_features]].values
-    # base_X_test = base_df.loc[base_test_idc, base_df.columns[:n_features]].values
-    # base_y_train = base_df.loc[base_train_idc, 'y'].values
-    # base_y_test = base_df.loc[base_test_idc, 'y'].values
+    if model.startswith('DNNC'):
+        base_train_grouped = base_df.iloc[base_train_idc, :].groupby('sample_id')
+        base_X_train = np.array([group.values for _, group in base_train_grouped])[:, :, :n_features]
+        base_y_train = base_train_grouped['y'].first().values
+        
+        base_test_grouped = base_df.iloc[base_test_idc, :].groupby('sample_id')
+        base_X_test = np.array([group.values for _, group in base_test_grouped])[:, :, :n_features]
+        base_y_test = base_test_grouped['y'].first().values
+        # base_df = base_df.groupby('sample_id').first()
+    else:
+        base_X_train = base_df.loc[base_train_idc, base_df.columns[:n_features]].values
+        base_X_test = base_df.loc[base_test_idc, base_df.columns[:n_features]].values
+        base_y_train = base_df.loc[base_train_idc, 'y'].values
+        base_y_test = base_df.loc[base_test_idc, 'y'].values
 
     if print_intermediate:
         print(base_X_train.shape, base_X_test.shape, base_y_train.shape, base_y_test.shape)
@@ -137,6 +135,8 @@ def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_te
 
     if model == 'SVM':
         return run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, base_df, tgt_df)
+    if model == 'SVMTL':
+        return run_ml_fstl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, base_df, tgt_df)
     elif model == 'DNNTL':
         return run_dnn_fstl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
     elif model.startswith('DNN'):
@@ -173,7 +173,10 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
         scaler, base_df_copy = scale_features(base_df_copy, base_features, train_indices, test_indices)
 
         metrics = run_data_fold_tl(scaler, model, base_df_copy, base_features, train_indices, test_indices, target_df_copy)
-        if model == 'DNNTL':
+        print(np.shape(metrics))
+        print(np.shape(metrics[0]))
+
+        if model.endswith('TL'):
             file_metric, subject_metric, base_metric, n_tgt_train_samples = zip(*metrics)
         else:
             file_metric, subject_metric, base_metric = zip(*metrics)
