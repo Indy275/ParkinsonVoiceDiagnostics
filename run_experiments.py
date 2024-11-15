@@ -138,7 +138,7 @@ def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_te
     if model == 'SVMFSTL':
         return run_ml_fstl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, base_df, tgt_df)
     elif model == 'DNNFSTL':
-        return run_dnn_fstl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
+        return run_dnn_fstl_model(scaler, model, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
     elif model.startswith('DNN'):
         return run_dnn_tl_model(scaler, model, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
     
@@ -186,17 +186,24 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
         file_metrics.append(file_metric)
         subject_metrics.append(subject_metric)
         base_metrics.append(base_metric)
+    if model.endswith('FSTL'):
+        fmetrics_df = pd.DataFrame(np.mean(file_metrics, axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
+        fmetrics_df['Iteration'] = n_tgt_train_samples
+        fmetrics_df.to_csv(os.path.join('experiments', f'{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}.csv'), index=False)
 
-    fmetrics_df = pd.DataFrame(np.mean(file_metrics, axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
-    fmetrics_df['Iteration'] = n_tgt_train_samples
-    fmetrics_df.to_csv(os.path.join('experiments', f'{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}.csv'), index=False)
-
-    smetrics_df = pd.DataFrame(np.mean(subject_metrics,axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
-    smetrics_df['Iteration'] = n_tgt_train_samples
-    smetrics_df.to_csv(os.path.join('experiments', f'{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}_grouped.csv'), index=False)
-    
-    base_metrics_df = pd.DataFrame(np.mean(base_metrics,axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
-    base_metrics_df['Iteration'] = n_tgt_train_samples
-    base_metrics_df.to_csv(os.path.join('experiments', f'{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}_base.csv'), index=False)
-    
-    print(f'Metrics saved to: experiments/{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}.csv')
+        smetrics_df = pd.DataFrame(np.mean(subject_metrics,axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
+        smetrics_df['Iteration'] = n_tgt_train_samples
+        smetrics_df.to_csv(os.path.join('experiments', f'{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}_grouped.csv'), index=False)
+        
+        base_metrics_df = pd.DataFrame(np.mean(base_metrics,axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
+        base_metrics_df['Iteration'] = n_tgt_train_samples
+        base_metrics_df.to_csv(os.path.join('experiments', f'{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}_base.csv'), index=False)
+        
+        print(f'Metrics saved to: experiments/{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}.csv')
+    else:
+        print(np.shape(file_metric))
+        fmetrics = np.mean(np.mean(file_metrics, axis=0))
+        smetrics = np.mean(np.mean(subject_metrics,axis=0))
+        base_metrics_ = np.mean(np.mean(base_metrics,axis=0))
+        print(f"Metrics for {ifm_nifm} {model}. Base: {base_dataset}, Target: {target_dataset}")
+        print("Avg fmetrics:",fmetrics, "\n Avg smetrics:",smetrics, "\n Avg Base metrics", base_metrics_)

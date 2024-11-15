@@ -79,7 +79,6 @@ def create_features(dataset, ifm_nifm):
     for id, file in enumerate(files):
         print("Processing file [{}/{}]".format(id+1, len(files)))
         path_to_file = os.path.join(dir, file) + '.wav'
-
         if ifm_nifm.startswith('ifm'):
             import get_ifm_features
             features = get_ifm_features.get_features(path_to_file)
@@ -92,7 +91,7 @@ def create_features(dataset, ifm_nifm):
         elif ifm_nifm.startswith('spec'):
             import get_ifm_features
             features = get_ifm_features.get_spectrograms(path_to_file)
-            
+
         X.extend(features)
         y.extend([1 if file[:2] == 'PD' else 0] * features.shape[0])
         subj_id.extend([file[-4:]] * features.shape[0])

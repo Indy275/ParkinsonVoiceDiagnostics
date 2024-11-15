@@ -152,7 +152,7 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, num_epochs
         for batch_data, batch_labels in train_loader:
             optimizer.zero_grad()  # Reset gradients
             outputs = model(batch_data)  # Get model predictions
-            print(batch_data.shape, outputs.shape, batch_labels.shape)
+            # print(batch_data.shape, outputs.shape, batch_labels.shape)
             loss = criterion(outputs, batch_labels)  # Compute the loss
             # print(outputs, batch_labels, loss)
             loss.backward()  # Compute gradients
@@ -197,14 +197,16 @@ def run_dnn_model(modeltype, X_train, X_test, y_train, y_test, test_df):
 def run_dnn_tl_model(scaler, modeltype, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df):
     n_features = base_X_train.shape[-1]
 
-    if modeltype.startswith('DNNC'):
-        base_model, optimizer, scheduler, criterion = create_cnn_model()
-    else:
-        base_model, optimizer, scheduler, criterion = create_dnn_model(n_features)
-
     base_X_train = torch.tensor(base_X_train).to(torch.float32)
     base_X_test = torch.tensor(base_X_test).to(torch.float32)
     base_y_train = torch.tensor(base_y_train)
+
+    if modeltype.startswith('DNNC'):
+        base_model, optimizer, scheduler, criterion = create_cnn_model()
+        base_X_train.unsqueeze(1)
+        base_X_test.unsqueeze(1)
+    else:
+        base_model, optimizer, scheduler, criterion = create_dnn_model(n_features)
 
     base_dataset = TensorDataset(base_X_train, base_y_train)
     base_loader = DataLoader(base_dataset, shuffle=True)
@@ -237,24 +239,31 @@ def run_dnn_tl_model(scaler, modeltype, base_X_train, base_X_test, base_y_train,
 
         # tgt_train_df = pd.concat([tgt_train_df, base_train_df])
 
-        tgt_train_grouped = base_df.iloc[train_indices, :].groupby('sample_id')
-        tgt_X_train = torch.tensor(np.array([group.values for _, group in tgt_train_grouped])[:, :, :n_features]).to(torch.float32)
-        tgt_y_train = torch.tensor(tgt_train_grouped['y'].first().values)
-
-        tgt_test_grouped = base_df.iloc[test_indices, :].groupby('sample_id')
-        tgt_X_test = torch.tensor(np.array([group.values for _, group in tgt_test_grouped])[:, :, :n_features]).to(torch.float32)
-        tgt_y_test = tgt_test_grouped['y'].first().values
-        tgt_test_df= tgt_test_grouped.first()
+        if modeltype.startswith('DNNC'):
+            tgt_train_grouped = tgt_df_copy.iloc[train_indices, :].groupby('sample_id')
+            tgt_X_train = torch.tensor(np.array([group.values for _, group in tgt_train_grouped])[:, :, :n_features]).to(torch.float32).unsqueeze(1)
+            tgt_y_train = torch.tensor(tgt_train_grouped['y'].first().values)
+            
+            tgt_test_grouped = tgt_df_copy.iloc[test_indices, :].groupby('sample_id')
+            tgt_X_test = torch.tensor(np.array([group.values for _, group in tgt_test_grouped])[:, :, :n_features]).to(torch.float32).unsqueeze(1)
+            tgt_y_test = tgt_test_grouped['y'].first().values
+            tgt_test_df= tgt_test_grouped.first()
+        else:
+            tgt_X_train = torch.tensor(tgt_df_copy.loc[train_indices, tgt_df_copy.columns[:n_features]].values).to(torch.float32)
+            tgt_X_test = torch.tensor(tgt_df_copy.loc[test_indices, tgt_df_copy.columns[:n_features]].values).to(torch.float32)
+            tgt_y_train = torch.tensor(tgt_df_copy.loc[train_indices, 'y'].values)
+            tgt_y_test = tgt_df_copy.loc[test_indices, 'y'].values
+            tgt_test_df = tgt_df_copy.loc[test_indices,:]
 
         tgt_dataset = TensorDataset(tgt_X_train, tgt_y_train)
         tgt_loader = DataLoader(tgt_dataset, shuffle=True)
 
         train_model(model, optimizer, scheduler, criterion, tgt_loader, num_epochs=3)
-
+        print(base_X_test.shape, tgt_X_test.shape)
         model.eval()
         with torch.no_grad():
-            base_preds = model(base_X_test.unsqueeze(1))
-            tgt_preds = model(tgt_X_test.unsqueeze(1))
+            base_preds = model(base_X_test)
+            tgt_preds = model(tgt_X_test)
             _, base_predicted = torch.max(base_preds.data, 1)
             _, tgt_predicted = torch.max(tgt_preds.data, 1)
         
@@ -270,15 +279,21 @@ def run_dnn_tl_model(scaler, modeltype, base_X_train, base_X_test, base_y_train,
     return zip(*[metrics_list, metrics_grouped, base_metrics])
 
 
-def run_dnn_fstl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df):
+def run_dnn_fstl_model(scaler, modeltype, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df):
     n_features = base_X_train.shape[1]
 
     base_X_train = torch.tensor(base_X_train).to(torch.float32)
     base_X_test = torch.tensor(base_X_test).to(torch.float32)
     base_y_train = torch.tensor(base_y_train)
     
-    base_model, optimizer, scheduler, criterion = create_dnn_model(n_features)
+    if modeltype.startswith('DNNC'):
+        base_model, optimizer, scheduler, criterion = create_cnn_model()
+        base_X_train.unsqueeze(1)
+        base_X_test.unsqueeze(1)
+    else:
+        base_model, optimizer, scheduler, criterion = create_dnn_model(n_features)
 
+    print("Base data:", base_X_train.shape, base_y_train.shape)
     base_dataset = TensorDataset(base_X_train, base_y_train)
     base_loader = DataLoader(base_dataset, shuffle=True)
 
@@ -316,6 +331,7 @@ def run_dnn_fstl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_t
             tgt_X_train = tgt_train_df.iloc[:, :n_features].values
             tgt_X_train = torch.tensor(tgt_X_train).to(torch.float32)
             tgt_y_train = torch.tensor(tgt_train_df['y'].values)
+            print("TGT data:", tgt_X_train.shape, tgt_y_train.shape)
 
             tgt_dataset = TensorDataset(tgt_X_train, tgt_y_train)
             tgt_loader = DataLoader(tgt_dataset, shuffle=True)

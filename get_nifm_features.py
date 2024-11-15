@@ -17,6 +17,9 @@ def get_features_vggish(audio_path):
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav_file:
                 wav_path = temp_wav_file.name  # Get the temporary file path
                 y, sr = sf.read(audio_path)  # Read MP3 using soundfile
+                min_audio_length = sr * 2  # at least 2 seconds of audio
+                if len(y) < min_audio_length:
+                    y = np.pad(y, int(np.ceil((min_audio_length - len(y))/2)))
                 sf.write(wav_path, y, sr, format='wav')  # Write to temporary WAV file
         return wav_path
 
