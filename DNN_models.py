@@ -28,59 +28,59 @@ class CNNModel(nn.Module):
         super(CNNModel, self).__init__()
         
         # Define convolutional layers with dropout
-        self.conv1 = nn.Conv2d(in_channels=1, out_channels=4, kernel_size=(2, 2), stride=1, padding=0)
-        self.dropout1 = nn.Dropout(p=0.5)
+        self.conv1 = nn.Conv2d(in_channels=1, out_channels=4, kernel_size=(2,2), stride=1, padding=0)
+        self.dropout1 = nn.Dropout(p=0.25)
         self.pool1 = nn.MaxPool2d(kernel_size=2, stride=2)
         
-        self.conv2 = nn.Conv2d(in_channels=4, out_channels=8, kernel_size=(2, 2), stride=1, padding=0)
-        self.dropout2 = nn.Dropout(p=0.5)
+        self.conv2 = nn.Conv2d(in_channels=4, out_channels=8, kernel_size=(2,2), stride=1, padding=0)
+        self.dropout2 = nn.Dropout(p=0.25)
         self.pool2 = nn.MaxPool2d(kernel_size=2, stride=2)
         
-        self.conv3 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=(2, 2), stride=1, padding=0)
-        self.dropout3 = nn.Dropout(p=0.5)
+        self.conv3 = nn.Conv2d(in_channels=8, out_channels=16, kernel_size=(2,2), stride=1, padding=0)
+        self.dropout3 = nn.Dropout(p=0.25)
         self.pool3 = nn.MaxPool2d(kernel_size=2, stride=2)
         
-        self.conv4 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(2, 2), stride=1, padding=0)
-        self.dropout4 = nn.Dropout(p=0.5)
+        self.conv4 = nn.Conv2d(in_channels=16, out_channels=32, kernel_size=(2,2), stride=1, padding=0)
+        self.dropout4 = nn.Dropout(p=0.25)
         self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
         
         # Fully connected layers with dropout
-        self.fc1 = nn.Linear(in_features=31, out_features=64)
-        self.dropout5 = nn.Dropout(p=0.5)
+        self.fc1 = nn.Linear(in_features=1792, out_features=256) 
+        self.dropout5 = nn.Dropout(p=0.25)
         
-        self.fc2 = nn.Linear(in_features=64, out_features=32)
-        self.dropout6 = nn.Dropout(p=0.5)
+        self.fc2 = nn.Linear(in_features=256, out_features=128)
+        self.dropout6 = nn.Dropout(p=0.25)
         
-        self.fc3 = nn.Linear(in_features=32, out_features=2)
+        self.fc3 = nn.Linear(in_features=128, out_features=2)
         
     def forward(self, x):
         # Pass input through convolutional layers with dropout and pooling
-        print(x.shape)
+        # print(x.shape)
         x = self.pool1(F.relu(self.dropout1(self.conv1(x))))
-        print(x.shape)
+        # print(x.shape)
 
         x = self.pool2(F.relu(self.dropout2(self.conv2(x))))
         # print(x.shape)
 
-        # x = self.pool3(F.relu(self.dropout3(self.conv3(x))))
+        x = self.pool3(F.relu(self.dropout3(self.conv3(x))))
         # print(x.shape)
 
-        # x = self.pool4(F.relu(self.dropout4(self.conv4(x))))
-        print(x.shape, "After Conv blocks")
+        x = self.pool4(F.relu(self.dropout4(self.conv4(x))))
+        # print(x.shape, "After Conv blocks")
         # Flatten the tensor for the fully connected layers
         x = x.view(x.size(0), -1)
-        print(x.shape, "After flattening")
+        # print(x.shape, "After flattening")
         
         # Pass through fully connected layers with dropout
         x = F.relu(self.dropout5(self.fc1(x)))
-        print(x.shape, "Lin1")
+        # print(x.shape, "Lin1")
 
         x = F.relu(self.dropout6(self.fc2(x)))
-        print(x.shape)
+        # print(x.shape)
 
         x = self.fc3(x)
         x = torch.sigmoid(x)
-        print(x.shape, "Output shape")
+        # print(x.shape, "Output shape")
         
         return x
     
@@ -133,15 +133,15 @@ class DNNModel(nn.Module):
 def create_dnn_model(n_features):
     input_size = n_features
     model = DNNModel(input_size)
-    optimizer = optim.AdamW(model.parameters(), lr=0.0001)
+    optimizer = optim.AdamW(model.parameters(), lr=0.001)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.6)
     criterion = nn.CrossEntropyLoss()
     return model, optimizer, scheduler, criterion
 
 def create_cnn_model():
     model = CNNModel()
-    optimizer = optim.AdamW(model.parameters(), lr=0.0005, weight_decay=1e-4)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=200, gamma=0.6)
+    optimizer = optim.AdamW(model.parameters(), lr=0.0005)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.6)
     criterion = nn.CrossEntropyLoss()
     return model, optimizer, scheduler, criterion
 
@@ -172,13 +172,13 @@ def run_dnn_model(modeltype, X_train, X_test, y_train, y_test, test_df):
 
     if modeltype.startswith('DNNC'):
         model, optimizer, scheduler, criterion = create_cnn_model()
-        X_train.unsqueeze(1)
-        X_test.unsqueeze(1)
+        X_train = X_train.unsqueeze(1)
+        X_test = X_test.unsqueeze(1)
     else:
         model, optimizer, scheduler, criterion = create_dnn_model(n_features)
 
     train_dataset = TensorDataset(X_train, y_train)
-    train_loader = DataLoader(train_dataset, shuffle=True)
+    train_loader = DataLoader(train_dataset, batch_size=8, shuffle=True)
 
     train_model(model, optimizer, scheduler, criterion, train_loader)
 
@@ -203,8 +203,8 @@ def run_dnn_tl_model(scaler, modeltype, base_X_train, base_X_test, base_y_train,
 
     if modeltype.startswith('DNNC'):
         base_model, optimizer, scheduler, criterion = create_cnn_model()
-        base_X_train.unsqueeze(1)
-        base_X_test.unsqueeze(1)
+        base_X_train= base_X_train.unsqueeze(1)
+        base_X_test=base_X_test.unsqueeze(1)
     else:
         base_model, optimizer, scheduler, criterion = create_dnn_model(n_features)
 
@@ -280,7 +280,7 @@ def run_dnn_tl_model(scaler, modeltype, base_X_train, base_X_test, base_y_train,
 
 
 def run_dnn_fstl_model(scaler, modeltype, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df):
-    n_features = base_X_train.shape[1]
+    n_features = base_X_train.shape[-1]
 
     base_X_train = torch.tensor(base_X_train).to(torch.float32)
     base_X_test = torch.tensor(base_X_test).to(torch.float32)
@@ -288,8 +288,8 @@ def run_dnn_fstl_model(scaler, modeltype, base_X_train, base_X_test, base_y_trai
     
     if modeltype.startswith('DNNC'):
         base_model, optimizer, scheduler, criterion = create_cnn_model()
-        base_X_train.unsqueeze(1)
-        base_X_test.unsqueeze(1)
+        base_X_train=base_X_train.unsqueeze(1)
+        base_X_test=base_X_test.unsqueeze(1)
     else:
         base_model, optimizer, scheduler, criterion = create_dnn_model(n_features)
 
@@ -297,7 +297,7 @@ def run_dnn_fstl_model(scaler, modeltype, base_X_train, base_X_test, base_y_trai
     base_dataset = TensorDataset(base_X_train, base_y_train)
     base_loader = DataLoader(base_dataset, shuffle=True)
 
-    train_model(base_model, optimizer, scheduler, criterion, base_loader)
+    train_model(base_model, optimizer, scheduler, criterion, base_loader, num_epochs=8)
 
     base_pos_subjs = list(base_df[base_df['y'] == 1]['subject_id'].unique())
     base_neg_subjs = list(base_df[base_df['y'] == 0]['subject_id'].unique())
@@ -313,38 +313,48 @@ def run_dnn_fstl_model(scaler, modeltype, base_X_train, base_X_test, base_y_trai
         scaler_copy = deepcopy(scaler)
         model = deepcopy(base_model)
         model.load_state_dict(base_model.state_dict())
-        optimizer = optim.AdamW(model.parameters(), lr=0.0005)
+        optimizer = optim.AdamW(model.parameters(), lr=0.001)
         scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
 
         if n_shots > 0:
             # Fine-tune model with pos and neg samples from base and target set
-            base_train_df, _ = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots/3)), base_df)
+            base_train_df, _ = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots/6)), base_df)
             tgt_train_df, tgt_test_df = get_samples(seed, pos_subjs, neg_subjs, n_shots, tgt_df)
 
             # Add target train data to scaler fit
             scaler_copy.partial_fit(tgt_train_df.iloc[:, :n_features].values) 
-            tgt_train_df.iloc[:, :n_features] = scaler_copy.transform(tgt_train_df.iloc[:, :n_features].values)
-            tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)
+            tgt_train_df.iloc[:, :n_features] = scaler_copy.transform(tgt_train_df.iloc[:, :n_features].values).astype(float)
+            tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values).astype(float)
 
-            tgt_train_df = pd.concat([tgt_train_df, base_train_df])
+            tgt_train_df = pd.concat([tgt_train_df, base_train_df], ignore_index=True, axis=0)
 
-            tgt_X_train = tgt_train_df.iloc[:, :n_features].values
-            tgt_X_train = torch.tensor(tgt_X_train).to(torch.float32)
-            tgt_y_train = torch.tensor(tgt_train_df['y'].values)
-            print("TGT data:", tgt_X_train.shape, tgt_y_train.shape)
+            if modeltype.startswith('DNNC'):
+                tgt_train_grouped = tgt_train_df.groupby('sample_id')
+                tgt_X_train = np.array([group.values for _, group in tgt_train_grouped])[:, :, :n_features].astype(float)
+                tgt_X_train = torch.tensor(tgt_X_train).to(torch.float32).unsqueeze(1)
+                tgt_y_train = torch.tensor(tgt_train_grouped['y'].first().values)
+            else:
+                tgt_X_train = torch.tensor(tgt_train_df.loc[:, tgt_train_df.columns[:n_features]].values).to(torch.float32)
+                tgt_y_train = torch.tensor(tgt_train_df.loc[:, 'y'].values)
 
             tgt_dataset = TensorDataset(tgt_X_train, tgt_y_train)
             tgt_loader = DataLoader(tgt_dataset, shuffle=True)
 
-            train_model(model, optimizer, scheduler, criterion, tgt_loader, num_epochs=3)
+            train_model(model, optimizer, scheduler, criterion, tgt_loader, num_epochs=8)
         else: # n_shots == 0
             # Use entire tgt set for evaluation
             tgt_test_df = deepcopy(tgt_df)
-            tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)
-
-        tgt_X_test = tgt_test_df.iloc[:, :n_features].values
-        tgt_X_test = torch.tensor(tgt_X_test).to(torch.float32)
-        tgt_y_test = tgt_test_df['y']
+            tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values).astype(float)
+        
+        if modeltype.startswith('DNNC'):
+            tgt_test_grouped = tgt_test_df.groupby('sample_id')
+            tgt_X_test = np.array([group.values for _, group in tgt_test_grouped])[:, :, :n_features].astype(float)
+            tgt_X_test = torch.tensor(tgt_X_test).to(torch.float32).unsqueeze(1)
+            tgt_y_test = tgt_test_grouped['y'].first().values
+            tgt_test_df= tgt_test_grouped.first()
+        else:
+            tgt_X_test = torch.tensor(tgt_test_df.loc[:, tgt_test_df.columns[:n_features]].values).to(torch.float32)
+            tgt_y_test = tgt_test_df.loc[:, 'y'].values
 
         model.eval()
         with torch.no_grad():

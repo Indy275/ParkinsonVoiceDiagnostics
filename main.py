@@ -59,5 +59,5 @@ if run_pretrained:
     import pretrained_model
     pretrained_model.run_ptm(base_dataset)
 
-from plotting import results_visualised
-results_visualised.plot_TL_performance(base_dataset, target_dataset)
+# from plotting import results_visualised
+# results_visualised.plot_TL_performance(base_dataset, target_dataset)

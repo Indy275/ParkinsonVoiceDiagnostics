@@ -1,11 +1,12 @@
 import numpy as np
 import librosa
 import librosa.display as display
+import matplotlib.pyplot as plt
+
 import scipy.stats
 
 import parselmouth
 from parselmouth.praat import call
-import matplotlib.pyplot as plt
 
 sr = 16000  # Sampling rate
 frame_size = int(0.04 * sr)  # Number of samples per frame
@@ -130,15 +131,15 @@ def get_features(path_to_file):
 def get_spectrograms(file_path):
     sr = 16000
     start_time = sr * 1
-    audio_length = sr * 2 # 5 seconds of audio
+    audio_length = sr * 8 # 5 seconds of audio
     y, sr = librosa.load(file_path, sr=sr)  
     if len(y) < audio_length+start_time:
             y = np.pad(y, int(np.ceil((start_time+audio_length - len(y))/2)))
     y = y[start_time:start_time+audio_length]
 
-    spectrogram = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=512, hop_length=128, n_mels=80)
+    spectrogram = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=80) #n_fft=256, hop_length=64, n_mels=80)
     spectrogram_db = librosa.power_to_db(spectrogram, ref=np.max)
-    
+    # print("mine", spectrogram_db.shape)
     # fig, ax = plt.subplots()
     # img = display.specshow(spectrogram_db, y_axis='mel', x_axis='time', ax=ax)
     # ax.set(title='Mel spectrogram display')
@@ -148,8 +149,9 @@ def get_spectrograms(file_path):
     # fig, ax = plt.subplots()
     # M = librosa.feature.melspectrogram(y=y, sr=sr)
     # M_db = librosa.power_to_db(M, ref=np.max)
+    # print("theirs",M_db.shape)
     # img = librosa.display.specshow(M_db, y_axis='mel', x_axis='time', ax=ax)
     # ax.set(title='Mel spectrogram display')
     # fig.colorbar(img, ax=ax, format="%+2.f dB")
-    # # plt.show()
+    # plt.show()
     return spectrogram_db.T

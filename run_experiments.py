@@ -4,6 +4,10 @@ import numpy as np
 import pandas as pd
 import configparser
 
+import librosa
+import librosa.display as display
+import matplotlib.pyplot as plt
+
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedKFold
 from data_util import load_data, scale_features
@@ -49,7 +53,6 @@ def run_data_fold(model, df, n_features, train_indices, test_indices):
         test_df = df.loc[test_indices, :]
 
     if print_intermediate:
-        print(X_train.shape, X_test.shape, y_train.shape, y_test.shape)
         print("Train subjects:", np.sort(df.loc[train_indices, 'subject_id'].unique()), '({})'.format(len(np.sort(df.loc[train_indices, 'subject_id'].unique()))))
         print("Test subjects:", np.sort(df.loc[test_indices, 'subject_id'].unique()), '({})'.format(len(np.sort(df.loc[test_indices, 'subject_id'].unique()))))
         print("Train/test shapes:", X_train.shape, X_test.shape, y_train.shape, y_test.shape)
@@ -58,7 +61,7 @@ def run_data_fold(model, df, n_features, train_indices, test_indices):
         print("Train %male",round(df.loc[train_indices, 'gender'].sum() / len(train_indices),3))
         print("Test %male",round(df.loc[test_indices, 'gender'].sum()/  len(test_indices),3))
 
-    if model == 'SVM':
+    if model.startswith('SVM'):
         return run_ml_model(X_train, X_test, y_train, y_test, test_df)
     elif model == 'PCA_PLDA':
         return run_PCA_PLDA(X_train, X_test, y_train, y_test, test_df)
@@ -110,11 +113,11 @@ def run_monolingual(dataset, ifm_nifm, model, k=2):
 def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_test_idc, tgt_df):
     if model.startswith('DNNC'):
         base_train_grouped = base_df.iloc[base_train_idc, :].groupby('sample_id')
-        base_X_train = np.array([group.values for _, group in base_train_grouped])[:, :, :n_features]
+        base_X_train = np.array([group.values for _, group in base_train_grouped])[:, :, :n_features].astype(float)
         base_y_train = base_train_grouped['y'].first().values
         
         base_test_grouped = base_df.iloc[base_test_idc, :].groupby('sample_id')
-        base_X_test = np.array([group.values for _, group in base_test_grouped])[:, :, :n_features]
+        base_X_test = np.array([group.values for _, group in base_test_grouped])[:, :, :n_features].astype(float)
         base_y_test = base_test_grouped['y'].first().values
         # base_df = base_df.groupby('sample_id').first()
     else:
@@ -124,7 +127,6 @@ def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_te
         base_y_test = base_df.loc[base_test_idc, 'y'].values
 
     if print_intermediate:
-        print(base_X_train.shape, base_X_test.shape, base_y_train.shape, base_y_test.shape)
         print("Train subjects:", np.sort(base_df.loc[base_train_idc, 'subject_id'].unique()))
         print("Test subjects:", np.sort(base_df.loc[base_test_idc, 'subject_id'].unique()))
         print("Train/test shapes:", base_X_train.shape, base_X_test.shape, base_y_train.shape, base_y_test.shape)
@@ -137,7 +139,7 @@ def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_te
         return run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, base_df, tgt_df)
     if model == 'SVMFSTL':
         return run_ml_fstl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, base_df, tgt_df)
-    elif model == 'DNNFSTL':
+    elif model.endswith('FSTL'): 
         return run_dnn_fstl_model(scaler, model, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
     elif model.startswith('DNN'):
         return run_dnn_tl_model(scaler, model, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
@@ -148,6 +150,8 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
     target_df, target_features = load_data(target_dataset, ifm_nifm)
     assert base_features == target_features, "Number of features across languages should be equal: {} and {}".format(
         base_features, target_features)
+    base_df['sample_id'] = 'base_' + base_df['sample_id'].astype(str)
+    target_df['sample_id'] = 'tgt_' + target_df['sample_id'].astype(str)
 
     # Experiment: only include Male/Female participants
     if gender < 2:

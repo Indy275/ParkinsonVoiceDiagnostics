@@ -20,7 +20,8 @@ print_intermediate = config.getboolean('OUTPUT_SETTINGS', 'print_intermediate')
 
 
 def run_ml_model(X_train, X_test, y_train, y_test, test_df):
-    clf = SVC(kernel='linear')
+    # clf = SVC(kernel='linear')
+    clf = SGDClassifier()
     # clf = RandomForestClassifier()
     
     clf.fit(X_train, y_train)
@@ -202,7 +203,7 @@ def run_ml_fstl_model(scaler, base_X_train, base_X_test, base_y_train, base_y_te
 
     metrics_list, metrics_grouped, n_tgt_train_samples, base_metrics = [], [], [], []
     seed = int(random.random()*10000)
-    for n_shots in range(1, max_shot+1):
+    for n_shots in range(max_shot+1):
         scaler_copy = deepcopy(scaler)
         clf = deepcopy(base_clf)  # Copy model trained on base language
         if n_shots > 0:

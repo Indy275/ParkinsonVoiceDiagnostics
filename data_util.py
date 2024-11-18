@@ -2,7 +2,7 @@ import random
 import pandas as pd
 import os
 import configparser
-from sklearn.preprocessing import StandardScaler
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 if os.getenv("COLAB_RELEASE_TAG"):  # colab
     data_dir = '/content/drive/My Drive/RAIVD_data/'
@@ -36,6 +36,7 @@ def load_data(dataset, ifm_nifm):
 
 def scale_features(df, n_features, train_indices, test_indices):
     scaler = StandardScaler()
+    # scaler = MinMaxScaler((0, 1))
 
     X_train = df.loc[train_indices, df.columns[:n_features]]
     X_test = df.loc[test_indices, df.columns[:n_features]]
