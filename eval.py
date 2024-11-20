@@ -29,7 +29,7 @@ def get_scores(clf_name, y_test, preds):
         float(recall_score(y_test, preds, pos_label=0))
 
 
-def evaluate_predictions(clf_name, tgt_y, tgt_df, base_y=None, base_preds=None):
+def evaluate_predictions(clf_name, tgt_y, tgt_df, base_y=None, base_df=None):
     metrics = []
     if print_perf_results:
         print(f"Prediction scores for {clf_name}:")
@@ -41,7 +41,9 @@ def evaluate_predictions(clf_name, tgt_y, tgt_df, base_y=None, base_preds=None):
     metrics.append(get_scores('Speaker-level', samples_ytest['y'].tolist(), samples_preds['preds'].tolist()))
     
     if base_y is not None:
-        metrics.append(get_scores('Base language', base_y.tolist(), base_preds.tolist()))
+        base_preds = base_df.groupby('subject_id').agg({'preds': lambda x: x.mode()[0]}).reset_index()
+        base_y = base_df.groupby('subject_id').agg({'y': lambda x: x.mode()[0]}).reset_index()
+        metrics.append(get_scores('Base language', base_y['y'].tolist(), base_preds['preds'].tolist()))
     return zip(*metrics)
 
 
