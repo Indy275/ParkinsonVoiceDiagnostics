@@ -6,9 +6,9 @@ import os
 import configparser
 
 # NeuroVoz TDU, DDK. PCGITA TDU, DDK. IPVS TDU, DDK
-IFM = [0.862, 0.830, 0.750, 0.74, 1.0, 0.983]
+IFM = [0.68, 0.62, 0.67, 0.64, 0.99, 0.70]
 
-NIFM = [0.832, 0.80, 0.770, 0.700, 0.983, 0.935]
+NIFM = [0.68, 0.72, 0.67, 0.65, 0.98, 0.93]
 
 labs = ['TDU', 'DDK','TDU', 'DDK','TDU', 'DDK']
 indices = np.arange(len(IFM))  # the label locations
@@ -19,7 +19,7 @@ fig, ax = plt.subplots(figsize=(6, 4))
 bar1 = ax.bar(indices - width/2, IFM, width, label='IFM', capsize=5, color='g', alpha=0.7)
 bar2 = ax.bar(indices + width/2, NIFM, width, label='NIFM', capsize=5, color='r', alpha=0.7)
 
-ax.set_xlim((0.5, 1))
+ax.set_ylim((0.5, 1))
 ax.set_xlabel('\nData set')
 ax.set_ylabel('Model performance (AUC)')
 ax.set_title('Comparison of feature types on different data sets')
