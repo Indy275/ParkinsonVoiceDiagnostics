@@ -151,9 +151,6 @@ class PCA_PLDA_EER_Classifier(BaseEstimator, ClassifierMixin):
     
 
 def run_PCA_PLDA(X_train, X_test, y_train, y_test, test_df):
-    X_train[X_train.isna()] = 0 
-    X_test[X_test.isna()] = 0 
-
     clf = PCA_PLDA_EER_Classifier()
     X_train = np.array(X_train)
     X_test = np.array(X_test)

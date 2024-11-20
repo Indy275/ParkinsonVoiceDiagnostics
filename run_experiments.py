@@ -34,39 +34,26 @@ if not os.path.exists(experiment_folder):
     os.makedirs(experiment_folder)
 
 
-def run_data_fold(model, df, n_features, train_indices, test_indices):
-    # feature_cols = df.columns[20:33]#[*df.columns[:20], *df.columns[33:n_features]]
-    if model.startswith('DNNC'):
-        train_grouped = df.iloc[train_indices, :].groupby('sample_id')
-        X_train = np.array([group.values for _, group in train_grouped])[:, :, :n_features]
-        y_train = train_grouped['y'].first().values
-        
-        test_grouped = df.iloc[test_indices, :].groupby('sample_id')
-        X_test = np.array([group.values for _, group in test_grouped])[:, :, :n_features]
-        y_test = test_grouped['y'].first().values
-        test_df = test_grouped.first()
-    else:
-        X_train = df.loc[train_indices, df.columns[:n_features]].values
-        X_test = df.loc[test_indices, df.columns[:n_features]].values
-        y_train = df.loc[train_indices, 'y'].values
-        y_test = df.loc[test_indices, 'y'].values
-        test_df = df.loc[test_indices, :]
+def run_data_fold(model, df, train_indices, test_indices):
+    train_df = df.loc[train_indices, :]
+    test_df = df.loc[test_indices, :]
 
     if print_intermediate:
-        print("Train subjects:", np.sort(df.loc[train_indices, 'subject_id'].unique()), '({})'.format(len(np.sort(df.loc[train_indices, 'subject_id'].unique()))))
-        print("Test subjects:", np.sort(df.loc[test_indices, 'subject_id'].unique()), '({})'.format(len(np.sort(df.loc[test_indices, 'subject_id'].unique()))))
-        print("Train/test shapes:", X_train.shape, X_test.shape, y_train.shape, y_test.shape)
-        print("Train %PD:",round(df.loc[train_indices, 'y'].sum() / len(train_indices),3))
-        print("Test %PD:",round(df.loc[test_indices, 'y'].sum() / len(test_indices),3))
-        print("Train %male",round(df.loc[train_indices, 'gender'].sum() / len(train_indices),3))
-        print("Test %male",round(df.loc[test_indices, 'gender'].sum()/  len(test_indices),3))
+        print("Train subjects:", np.sort(train_df.loc[:, 'subject_id'].unique()), '({})'.format(len(np.sort(train_df.loc[:, 'subject_id'].unique()))))
+        print("Test subjects:", np.sort(df.loc[:, 'subject_id'].unique()), '({})'.format(len(np.sort(test_df.loc[:, 'subject_id'].unique()))))
+        # print("Train/test shapes:", X_train.shape, X_test.shape, y_train.shape, y_test.shape)
+        print("Train %PD:",round(train_df.loc[:, 'y'].sum() / len(train_indices),3))
+        print("Test %PD:",round(test_df.loc[:, 'y'].sum() / len(test_indices),3))
+        print("Train %male",round(train_df.loc[:, 'gender'].sum() / len(train_indices),3))
+        print("Test %male",round(test_df.loc[:, 'gender'].sum()/  len(test_indices),3))
 
     if model.startswith('SVM'):
-        return run_ml_model(X_train, X_test, y_train, y_test, test_df)
+        return run_ml_model(train_df, test_df)
     elif model == 'PCA_PLDA':
-        return run_PCA_PLDA(X_train, X_test, y_train, y_test, test_df)
+        print("Model PCA-PLDA is no longer supported")
+        # return run_PCA_PLDA(train_df, test_df)
     elif model.startswith('DNN'):
-        return run_dnn_model(model, X_train, X_test, y_train, y_test, test_df)
+        return run_dnn_model(model, train_df, test_df)
 
 
 def run_monolingual(dataset, ifm_nifm, model, k=2):
@@ -92,10 +79,10 @@ def run_monolingual(dataset, ifm_nifm, model, k=2):
         test_indices = df_copy[df_copy['subject_id'].isin(test_subjects)].index.tolist()
 
         _, df_copy = scale_features(df_copy, n_features, train_indices, test_indices)
-        file_metric, subject_metric = run_data_fold(model, df_copy, n_features, train_indices, test_indices)
+        file_metric, subject_metric = run_data_fold(model, df_copy, train_indices, test_indices)
         file_metrics.append(file_metric)
         subject_metrics.append(subject_metric)
-
+    print(f"Average {k}-fold performance of {model}-{ifm_nifm} model with {dataset} data:")
     if dataset[-3:] != 'tdu' and dataset[-3:] != 'ddk':
         print("File-level performance:")
         print("Mean Acc:", round(sum(i[0] for i in file_metrics)/k, 3))
@@ -110,39 +97,27 @@ def run_monolingual(dataset, ifm_nifm, model, k=2):
     print("Mean Spec:", round(sum(i[3] for i in subject_metrics)/k, 3))
 
 
-def run_data_fold_tl(scaler, model, base_df, n_features, base_train_idc, base_test_idc, tgt_df):
-    if model.startswith('DNNC'):
-        base_train_grouped = base_df.iloc[base_train_idc, :].groupby('sample_id')
-        base_X_train = np.array([group.values for _, group in base_train_grouped])[:, :, :n_features].astype(float)
-        base_y_train = base_train_grouped['y'].first().values
-        
-        base_test_grouped = base_df.iloc[base_test_idc, :].groupby('sample_id')
-        base_X_test = np.array([group.values for _, group in base_test_grouped])[:, :, :n_features].astype(float)
-        base_y_test = base_test_grouped['y'].first().values
-        # base_df = base_df.groupby('sample_id').first()
-    else:
-        base_X_train = base_df.loc[base_train_idc, base_df.columns[:n_features]].values
-        base_X_test = base_df.loc[base_test_idc, base_df.columns[:n_features]].values
-        base_y_train = base_df.loc[base_train_idc, 'y'].values
-        base_y_test = base_df.loc[base_test_idc, 'y'].values
+def run_data_fold_tl(scaler, model, base_df, base_train_idc, base_test_idc, tgt_df):
+    base_train_df = base_df.loc[base_train_idc, :]
+    base_test_df = base_df.loc[base_test_idc, :]
 
     if print_intermediate:
         print("Train subjects:", np.sort(base_df.loc[base_train_idc, 'subject_id'].unique()))
         print("Test subjects:", np.sort(base_df.loc[base_test_idc, 'subject_id'].unique()))
-        print("Train/test shapes:", base_X_train.shape, base_X_test.shape, base_y_train.shape, base_y_test.shape)
+        # print("Train/test shapes:", base_X_train.shape, base_X_test.shape, base_y_train.shape, base_y_test.shape)
         print("Train %PD:",round(base_df.loc[base_train_idc, 'y'].sum()/ len(base_train_idc),3))
         print("Test %PD:",round(base_df.loc[base_test_idc, 'y'].sum()/ len(base_test_idc),3))
         print("Train %male",round(base_df.loc[base_train_idc, 'gender'].sum()/ len(base_train_idc),3))
         print("Test %male",round(base_df.loc[base_test_idc, 'gender'].sum()/ len(base_test_idc),3)) 
 
     if model == 'SVM':
-        return run_ml_tl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, base_df, tgt_df)
+        return run_ml_tl_model(scaler, base_train_df, base_test_df, tgt_df)
     if model == 'SVMFSTL':
-        return run_ml_fstl_model(scaler, base_X_train, base_X_test, base_y_train,  base_y_test, base_df, tgt_df)
+        return run_ml_fstl_model(scaler, base_train_df, base_test_df, tgt_df)
     elif model.endswith('FSTL'): 
-        return run_dnn_fstl_model(scaler, model, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
+        return run_dnn_fstl_model(scaler, model, base_train_df, base_test_df, tgt_df)
     elif model.startswith('DNN'):
-        return run_dnn_tl_model(scaler, model, base_X_train, base_X_test, base_y_train, base_y_test, base_df, tgt_df)
+        return run_dnn_tl_model(scaler, model, base_train_df, base_test_df, tgt_df)
     
 
 def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
@@ -176,16 +151,13 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
 
         scaler, base_df_copy = scale_features(base_df_copy, base_features, train_indices, test_indices)
 
-        metrics = run_data_fold_tl(scaler, model, base_df_copy, base_features, train_indices, test_indices, target_df_copy)
-
+        metrics = run_data_fold_tl(scaler, model, base_df_copy, train_indices, test_indices, target_df_copy)
         if model.endswith('FSTL'):
-            file_metric = metrics[0]
-            subject_metric = metrics[1]
-            base_metric = metrics[2]
-            n_tgt_train_samples = metrics[3]
-            # file_metric, subject_metric, base_metric, n_tgt_train_samples = zip(*metrics)
+            file_metric, subject_metric, base_metric, n_tgt_train_samples = zip(*metrics)
         else:
             file_metric, subject_metric, base_metric = zip(*metrics)
+        print(f"Average result for data fold [{i+1}/{k}]:\nFile metrics:",np.mean(file_metric, axis=0))
+        print("Subject metrics:",np.mean(subject_metric, axis=0),"\nBase metrics:",np.mean(base_metric, axis=0))
 
         file_metrics.append(file_metric)
         subject_metrics.append(subject_metric)
@@ -204,10 +176,23 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, model, k=2):
         base_metrics_df.to_csv(os.path.join('experiments', f'{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}_base.csv'), index=False)
         
         print(f'Metrics saved to: experiments/{model}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}.csv')
-    else:
-        print(np.shape(file_metric))
-        fmetrics = np.mean(np.mean(file_metrics, axis=0))
-        smetrics = np.mean(np.mean(subject_metrics,axis=0))
-        base_metrics_ = np.mean(np.mean(base_metrics,axis=0))
-        print(f"Metrics for {ifm_nifm} {model}. Base: {base_dataset}, Target: {target_dataset}")
-        print("Avg fmetrics:",fmetrics, "\n Avg smetrics:",smetrics, "\n Avg Base metrics", base_metrics_)
+    else:  # No Few-Shot
+        if base_dataset[-3:] != 'tdu' and base_dataset[-3:] != 'ddk':
+            print("Target data (file-level) performance:")
+            print("Mean Acc:", round(sum(i[0] for i in file_metrics)/k, 3))
+            print("Mean AUC:", round(sum(i[1] for i in file_metrics)/k, 3))
+            print("Mean Sens:", round(sum(i[2] for i in file_metrics)/k, 3))
+            print("Mean Spec:", round(sum(i[3] for i in file_metrics)/k, 3))
+        print(np.shape(file_metrics))
+
+        print("Target data (speaker-level) performance:")
+        print("Mean Acc:", round(np.mean(subject_metrics)[0], 3))
+        print("Mean AUC:", round(np.mean(np.mean(subject_metrics))[1], 3))
+        print("Mean Sens:", round(sum(i[2] for i in subject_metrics)/k, 3))
+        print("Mean Spec:", round(sum(i[3] for i in subject_metrics)/k, 3))
+        
+        print("Base data performance:")
+        print("Mean Acc:", round(sum(i[0] for i in subject_metrics)/k, 3))
+        print("Mean AUC:", round(sum(i[1] for i in subject_metrics)/k, 3))
+        print("Mean Sens:", round(sum(i[2] for i in subject_metrics)/k, 3))
+        print("Mean Spec:", round(sum(i[3] for i in subject_metrics)/k, 3))
