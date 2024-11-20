@@ -235,21 +235,28 @@ def modify_orig_id(row):
 
 
 def combine_rows():
+    data1 = 'ItalianPD'
+    data2 = 'NeuroVoz'
+    data3 = None
+    datasets = 'tdu_norm_vgg'
     store_location = os.path.join(data_dir, 'preprocessed_data')
-    df = pd.read_csv(os.path.join(store_location, 'ItalianPDddk_norm_ifm.csv'))
-    df2 = pd.read_csv(os.path.join(store_location, 'NeuroVozddk_norm_ifm.csv'))
-    # df3 = pd.read_csv(os.path.join(store_location, 'PCGITAtdu_ifm.csv'))
-
+    df = pd.read_csv(os.path.join(store_location, f'{data1}{datasets}.csv'))
+    df2 = pd.read_csv(os.path.join(store_location, f'{data2}{datasets}.csv'))
     df2['subject_id'] = df2.apply(lambda x: int(x['subject_id']) + 200, axis=1)
     df2['sample_id'] = df2.apply(lambda x: int(x['sample_id']) + 200, axis=1)
-
-    # df3['subject_id'] = df3.apply(lambda x: int(x['subject_id']) + 400, axis=1)
-    # df3['sample_id'] = df3.apply(lambda x: int(x['sample_id']) + 400, axis=1)
-
-    df_all = pd.concat([df, df2])#, df3])
+   
+    if data3:
+        df3 = pd.read_csv(os.path.join(store_location, f'{data3}{datasets}.csv'))
+        df3['subject_id'] = df3.apply(lambda x: int(x['subject_id']) + 400, axis=1)
+        df3['sample_id'] = df3.apply(lambda x: int(x['sample_id']) + 400, axis=1)
+        df_all = pd.concat([df, df2, df3])
+        dfname = f'{data1}{data2}{data3}{datasets}.csv'
+    else:
+        df_all = pd.concat([df, df2])
+        dfname = f'{data1}{data2}{datasets}.csv'
     print(df_all.columns, df_all.shape)
-    df_all.to_csv(os.path.join(store_location,'ItalianPDNeuroVozddk_norm_ifm.csv'), index=False)
-
+    df_all.to_csv(os.path.join(store_location,dfname), index=False)
+combine_rows()
 
 def combine_columns():
     store_location = os.path.join(data_dir, 'preprocessed_data')
