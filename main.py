@@ -48,7 +48,7 @@ if run_crosslingual:
     run_experiments.run_crosslingual(base_dataset, target_dataset, ifm_or_nifm, model=clf, k=kfolds)
 
 if plot_results:
-    if run_crosslingual:
+    if clf.endswith('FSTL'):
         from plotting import results_visualised
         results_visualised.plot_TL_performance(base_dataset, target_dataset)
     if run_monolingual:
