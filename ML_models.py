@@ -51,8 +51,9 @@ def run_ml_model(train_df, test_df):
 
     if plot_fimp:
         # fimp = sorted(zip(test_df.columns[:X_test.shape[1]], clf.feature_importances_), key=lambda l: l[1], reverse=True)
-        # fimp = clf.feature_importances_
-        fimp = list(map(np.abs, clf.coef_[0]))
+        fimp = clf.feature_importances_
+        # fimp = list(map(np.abs, clf.coef_[0]))
+        return file_scores, subj_scores, fimp
         
         acoustic_feats = ['F0_mean', 'F0_std','F0_min', 'F0_max', 'dF0_mean', 'ddF0_mean', '%Jitter', 'absJitter', 'RAP', 'PPQ5', 'DDP', '%Shimmer', 'dbShimmer', 'APQ3', 'APQ5', 'APQ11', 'DDA','F1_mean','F2_mean','F3_mean']
         mfcc_feats = ['mfcc1_mean', 'mfcc2_mean', 'mfcc3_mean', 'mfcc4_mean', 'mfcc5_mean', 'mfcc6_mean', 'mfcc7_mean', 'mfcc8_mean', 'mfcc9_mean', 'mfcc10_mean', 'mfcc11_mean', 'mfcc12_mean', 'mfcc13_mean', 'dmfcc1_mean', 'dmfcc2_mean', 'dmfcc3_mean', 'dmfcc4_mean', 'dmfcc5_mean', 'dmfcc6_mean', 'dmfcc7_mean', 'dmfcc8_mean', 'dmfcc9_mean', 'dmfcc10_mean', 'dmfcc11_mean', 'dmfcc12_mean', 'dmfcc13_mean', 'ddmfcc1_mean', 'ddmfcc2_mean', 'ddmfcc3_mean', 'ddmfcc4_mean', 'ddmfcc5_mean', 'ddmfcc6_mean', 'ddmfcc7_mean', 'ddmfcc8_mean', 'ddmfcc9_mean', 'ddmfcc10_mean', 'ddmfcc11_mean', 'ddmfcc12_mean', 'ddmfcc13_mean', 'mfcc1_std', 'mfcc2_std', 'mfcc3_std', 'mfcc4_std', 'mfcc5_std', 'mfcc6_std', 'mfcc7_std', 'mfcc8_std', 'mfcc9_std', 'mfcc10_std', 'mfcc11_std', 'mfcc12_std', 'mfcc13_std', 'dmfcc1_std', 'dmfcc2_std', 'dmfcc3_std', 'dmfcc4_std', 'dmfcc5_std', 'dmfcc6_std', 'dmfcc7_std', 'dmfcc8_std', 'dmfcc9_std', 'dmfcc10_std', 'dmfcc11_std', 'dmfcc12_std', 'dmfcc13_std', 'ddmfcc1_std', 'ddmfcc2_std', 'ddmfcc3_std', 'ddmfcc4_std', 'ddmfcc5_std', 'ddmfcc6_std', 'ddmfcc7_std', 'ddmfcc8_std', 'ddmfcc9_std', 'ddmfcc10_std', 'ddmfcc11_std', 'ddmfcc12_std', 'ddmfcc13_std', 'mfcc1_skew', 'mfcc2_skew', 'mfcc3_skew', 'mfcc4_skew', 'mfcc5_skew', 'mfcc6_skew', 'mfcc7_skew', 'mfcc8_skew', 'mfcc9_skew', 'mfcc10_skew', 'mfcc11_skew', 'mfcc12_skew', 'mfcc13_skew', 'dmfcc1_skew', 'dmfcc2_skew', 'dmfcc3_skew', 'dmfcc4_skew', 'dmfcc5_skew', 'dmfcc6_skew', 'dmfcc7_skew', 'dmfcc8_skew', 'dmfcc9_skew', 'dmfcc10_skew', 'dmfcc11_skew', 'dmfcc12_skew', 'dmfcc13_skew', 'ddmfcc1_skew', 'ddmfcc2_skew', 'ddmfcc3_skew', 'ddmfcc4_skew', 'ddmfcc5_skew', 'ddmfcc6_skew', 'ddmfcc7_skew', 'ddmfcc8_skew', 'ddmfcc9_skew', 'ddmfcc10_skew', 'ddmfcc11_skew', 'ddmfcc12_skew', 'ddmfcc13_skew', 'mfcc1_kurt', 'mfcc2_kurt', 'mfcc3_kurt', 'mfcc4_kurt', 'mfcc5_kurt', 'mfcc6_kurt', 'mfcc7_kurt', 'mfcc8_kurt', 'mfcc9_kurt', 'mfcc10_kurt', 'mfcc11_kurt', 'mfcc12_kurt', 'mfcc13_kurt', 'dmfcc1_kurt', 'dmfcc2_kurt', 'dmfcc3_kurt', 'dmfcc4_kurt', 'dmfcc5_kurt', 'dmfcc6_kurt', 'dmfcc7_kurt', 'dmfcc8_kurt', 'dmfcc9_kurt', 'dmfcc10_kurt', 'dmfcc11_kurt', 'dmfcc12_kurt', 'dmfcc13_kurt', 'ddmfcc1_kurt', 'ddmfcc2_kurt', 'ddmfcc3_kurt', 'ddmfcc4_kurt', 'ddmfcc5_kurt', 'ddmfcc6_kurt', 'ddmfcc7_kurt', 'ddmfcc8_kurt', 'ddmfcc9_kurt', 'ddmfcc10_kurt', 'ddmfcc11_kurt', 'ddmfcc12_kurt', 'ddmfcc13_kurt']
@@ -110,7 +111,6 @@ def run_ml_model(train_df, test_df):
         plt.tight_layout()
         plt.ylim((fl[0], fl[-1]))
         plt.show()
-
     return file_scores, subj_scores
 
 
