@@ -73,8 +73,8 @@ def rename_neurovoz_files():
 ############################### PC-GITA ###############################
 
 def rename_pcgita_files():
-    dir = data_dir + "PCGITA\\pataka\\"
-    modified_dir = data_dir + "PCGITA\\records_ddk\\"
+    dir = data_dir + "PCGITA\\records_a\\"
+    modified_dir = data_dir + "PCGITA\\records_aa\\"
     subj_files = defaultdict(list)
 
     for subdir, dirs, files in os.walk(dir):
@@ -85,17 +85,23 @@ def rename_pcgita_files():
                 subject_id = 'PD_{:04d}'.format([int(s) for s in re.findall(r'\d+', file)][0])
             f_path = os.path.join(subdir, file)
             subj_files[subject_id].append(f_path)
-
+    
+    # To copy every recording separately
     for subj_id, files in subj_files.items():
-        concat_audio = None
-        for audio_file in files:
-            audio = AudioSegment.from_wav(audio_file)
-            if concat_audio is None:
-                concat_audio = audio
-            else: concat_audio += audio
-        output_fname = os.path.join(modified_dir, f"{subj_id[:2]}_DDK_{subj_id[-4:]}.wav")
-        concat_audio.export(output_fname, format='wav')
-
+        for i, audio_file in enumerate(files):
+            output_fname = os.path.join(modified_dir, f"{subj_id[:2]}_A{i+1}_{subj_id[-4:]}.wav")
+            shutil.copy(audio_file, output_fname)
+        
+    # To concatenate audio recordings, use:
+    # for subj_id, files in subj_files.items():
+    #     concat_audio = None
+    #     for audio_file in files:
+    #         audio = AudioSegment.from_wav(audio_file)
+    #         if concat_audio is None:
+    #             concat_audio = audio
+    #         else: concat_audio += audio
+    #     output_fname = os.path.join(modified_dir, f"{subj_id[:2]}_DDK_{subj_id[-4:]}.wav")
+    #     concat_audio.export(output_fname, format='wav')
 
 def pcgita_gender():
     store_location = os.path.join(data_dir, 'PCGITA')
@@ -131,6 +137,17 @@ def rename_czech_files():
                     int(''.join(re.findall(r'\d+', file[2:4])))) + '.wav'
             shutil.copy(os.path.join(dir, file), os.path.join(modified_dir, new_fname))
 
+def czech_gender():
+    # czech data is lacking gender, so create a file with all zeroes
+    dir = data_dir + "CzechPD\\records_a_norm\\"
+    ids = []
+    for file in os.listdir(dir):
+        ids.append(file[-8:-4])
+    ids = list(sorted(set(ids)))  # remove dups
+
+    df = pd.DataFrame(data=ids, columns=['ID'])
+    df['Sex'] = 0
+    df.to_csv(os.path.join(data_dir, 'CzechPD', 'gender.csv'), index=False)
 
 ############################### IPVS ###############################
 
@@ -200,7 +217,20 @@ def rename_italian_files():
     df['ID'] = df['ID'].str[2:]
     df.to_csv(data_dir + 'ItalianPD\\gender.csv', index=False)
 
+ ########################### Turkish #########################################
 
+def read_turkish_df():
+    df = pd.read_csv(os.path.join(data_dir, 'Turkish', 'pd_speech_features.csv'))  
+    df.insert(len(df.columns)-1, 'gender', df.pop('gender'))
+    df.insert(len(df.columns)-1, 'id', df.pop('id'))
+    df = df.rename(columns={'class': 'y',
+                            'id': 'subject_id'})
+    df['sample_id'] = list(range(756))
+    print(df.columns)
+    # n=20
+    # for i in range(0, len(df.columns), n ):
+    #     print(df.columns[i:i+n])
+    df.to_csv(os.path.join(data_dir, 'preprocessed_data', 'TurkishPD_tdu_norm_ifm.csv'), index=False)
 ############################### Other functions ###############################
 
 def downsample(dataset, target_sample_rate=16000):
@@ -235,10 +265,10 @@ def modify_orig_id(row):
 
 
 def combine_rows():
-    data1 = 'ItalianPD'
-    data2 = 'NeuroVoz'
-    data3 = None
-    datasets = 'tdu_norm_vgg'
+    data1 = 'NeuroVoz'
+    data2 = 'PCGITA'
+    data3 =  'CzechPD'
+    datasets = '_a_norm_ifm'
     store_location = os.path.join(data_dir, 'preprocessed_data')
     df = pd.read_csv(os.path.join(store_location, f'{data1}{datasets}.csv'))
     df2 = pd.read_csv(os.path.join(store_location, f'{data2}{datasets}.csv'))
@@ -257,7 +287,6 @@ def combine_rows():
     print(df_all.columns, df_all.shape)
     df_all.to_csv(os.path.join(store_location,dfname), index=False)
 combine_rows()
-
 def combine_columns():
     store_location = os.path.join(data_dir, 'preprocessed_data')
     df = pd.read_csv(os.path.join(store_location, 'NeuroVoztdu_ifm.csv'))
@@ -268,3 +297,65 @@ def combine_columns():
 
     print(df_both.columns, df_both.shape)
     df_both.to_csv(os.path.join(store_location,'NeuroVoztdu_both.csv'), index=False)
+
+
+def preprocess():
+    store_location = os.path.join(data_dir, 'preprocessed_data')
+    df = pd.read_csv(os.path.join(data_dir, 'train_data.txt'))
+    # df2 = pd.read_csv(os.path.join(data_dir, 'test_data.txt'))
+    ran = list(range(26))
+    print(ran)
+    df.columns = ['subject_id'] +ran +['gender', 'y']
+    df['sample_id'] = 0
+    # df2.columns = ['subject_id'] +ran +['gender', 'y']
+    # df2['sample_id'] = 0
+    # df_both = pd.concat([df, df2])
+    df.insert(len(df.columns)-3, 'subject_id', df.pop('subject_id'))
+
+
+    print(df.columns, df.shape)
+    df.to_csv(os.path.join(store_location,'sakar_a.csv'), index=False)
+
+
+def getfeats():
+    # feats = [[('mfcc3_skew', 0.1019), ('ddmfcc3_std', 0.0581), ('mfcc8_mean', 0.0563), ('mfcc9_mean', 0.0532), ('ddmfcc1_mean', 0.051), ('mfcc10_mean', 0.0475)],
+    #         [('PPQ5', 0.0581), ('ddmfcc12_std', 0.0525), ('absJitter', 0.0501), ('ddmfcc2_std', 0.0483), ('dmfcc2_kurt', 0.045), ('ddmfcc11_std', 0.0449)],
+    #         [('ddmfcc1_kurt', 0.0541), ('ddmfcc4_std', 0.0523), ('RAP', 0.0448), ('ddmfcc7_std', 0.0421), ('ddmfcc12_std', 0.042)],
+    #         [('RAP', 0.0522), ('dmfcc7_kurt', 0.0501), ('ddmfcc10_std', 0.0441), ('ddmfcc1_kurt', 0.042), ('PPQ5', 0.04)],
+    #         [('ddmfcc1_std', 0.0522), ('ddmfcc12_std', 0.0502), ('ddmfcc2_std', 0.0466), ('RAP', 0.046), ('ddmfcc3_std', 0.0444)]
+    # ]
+    # feats = [[('dmfcc13_skew', 0.0), ('ddmfcc2_skew', 0.0), ('ddmfcc5_skew', 0.0), ('ddmfcc6_skew', 0.0), ('ddmfcc7_skew', 0.0), ('ddmfcc8_skew', 0.0), ('ddmfcc9_skew', 0.0), ('ddmfcc10_skew', 0.0), ('ddmfcc11_skew', 0.0), ('ddmfcc12_skew', 0.0), ('ddmfcc13_skew', 0.0), ('mfcc2_kurt', 0.0), ('mfcc4_kurt', 0.0), ('mfcc5_kurt', 0.0), ('mfcc6_kurt', 0.0), ('mfcc8_kurt', 0.0), ('mfcc10_kurt', 0.0), ('mfcc11_kurt', 0.0), ('ddmfcc12_kurt', 0.0), ('ddmfcc13_kurt', 0.0)],
+    #         [('ddmfcc7_skew', 0.0), ('ddmfcc8_skew', 0.0), ('ddmfcc9_skew', 0.0), ('ddmfcc10_skew', 0.0), ('ddmfcc11_skew', 0.0), ('ddmfcc12_skew', 0.0), ('ddmfcc13_skew', 0.0), ('mfcc2_kurt', 0.0), ('mfcc4_kurt', 0.0), ('mfcc5_kurt', 0.0), ('mfcc6_kurt', 0.0), ('mfcc7_kurt', 0.0), ('mfcc8_kurt', 0.0), ('mfcc9_kurt', 0.0), ('mfcc10_kurt', 0.0), ('mfcc11_kurt', 0.0), ('mfcc12_kurt', 0.0), ('mfcc13_kurt', 0.0), ('dmfcc10_kurt', 0.0), ('ddmfcc11_kurt', 0.0)],
+    #         [('ddmfcc3_skew', 0.0), ('ddmfcc4_skew', 0.0), ('ddmfcc5_skew', 0.0), ('ddmfcc7_skew', 0.0), ('ddmfcc8_skew', 0.0), ('ddmfcc9_skew', 0.0), ('ddmfcc10_skew', 0.0), ('ddmfcc13_skew', 0.0), ('mfcc3_kurt', 0.0), ('mfcc4_kurt', 0.0), ('mfcc5_kurt', 0.0), ('mfcc6_kurt', 0.0), ('mfcc7_kurt', 0.0), ('mfcc9_kurt', 0.0), ('mfcc10_kurt', 0.0), ('mfcc11_kurt', 0.0), ('mfcc12_kurt', 0.0), ('mfcc13_kurt', 0.0), ('dmfcc12_kurt', 0.0), ('dmfcc13_kurt', 0.0)]
+    #         ]
+    feats = [[('ddmfcc3_skew', 0.0628), ('mfcc2_skew', 0.0571), ('mfcc1_skew', 0.0444), ('mfcc2_kurt', 0.0401), ('ddmfcc3_kurt', 0.0293), ('mfcc3_kurt', 0.0291)]]
+
+
+    dic = defaultdict(list)
+    for f in feats:
+        for f0, f1 in f:
+            if f0 in dic.keys():
+                dic[f0].append(f1)
+            else:
+                dic[f0] = [f1]
+            print(f0, f1)
+    print(dic)
+    lis = []
+    for k, v in dic.items():
+        if len(v) > 1 or np.mean(v)>0.025:
+            print(k, len(v), np.mean(v))
+            lis.append(k)
+    print(lis)
+
+def add_dataset_col():
+    store_location = os.path.join(data_dir, 'preprocessed_data')
+
+    for file in os.listdir(store_location):
+        dataset = file.split('_')[0]
+        print(file, dataset)
+        if len(dataset) > 10:  # skip concatenated datasets
+            continue
+        df = pd.read_csv(os.path.join(store_location, file))
+        df['dataset'] = dataset
+        print(df.shape, df.columns)
+        df.to_csv(os.path.join(store_location, file), index=False)
