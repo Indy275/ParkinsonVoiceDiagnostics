@@ -10,15 +10,14 @@
 # PCGITA tdu done
 # PCGITA ddk done
 
-in_dir=C:\\Users\\INDYD\\Documents\\RAIVD_data\\PCGITA\\records_tdu\\
+in_dir=C:\\Users\\INDYD\\Documents\\RAIVD_data\\CzechPD\\modified_records\\
 temp_dir=C:\\Users\\INDYD\\Documents\\RAIVD_data\\NeuroVoz\\records_temp\\ # Some random empty folder suffices; can be removed afterwards
-out_dir=C:\\Users\\INDYD\\Documents\\RAIVD_data\\PCGITA\\records_tdu_norm\\
+out_dir=C:\\Users\\INDYD\\Documents\\RAIVD_data\\CzechPD\\records_a_norm\\
 
 for audio_File in "$in_dir"/*
 do
 	uttID=$(basename "$audio_File")
   temp_path=$temp_dir$uttID
-  echo $temp_path
 	ffmpeg-normalize $audio_File -o $temp_path -f -ar 16000
   out_path=$out_dir$uttID
   echo $out_path

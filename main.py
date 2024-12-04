@@ -3,7 +3,8 @@ import configparser
 config = configparser.ConfigParser()
 config.read('settings.ini')
 
-speech_task = config['DATA_SETTINGS']['speech_task']
+base_speech_task = config['DATA_SETTINGS']['base_speech_task']
+target_speech_task = config['DATA_SETTINGS']['target_speech_task']
 base_dataset = config['DATA_SETTINGS']['base_dataset']
 target_dataset = config['DATA_SETTINGS']['target_dataset']
 
@@ -18,15 +19,8 @@ run_pretrained = config.getboolean('RUN_SETTINGS', 'run_pretrained')
 
 plot_results = config.getboolean('OUTPUT_SETTINGS', 'plot_results')
 
-if speech_task == 'tdu':
-    base_dataset += 'tdu'
-    target_dataset += 'tdu'
-elif speech_task == 'ddk':
-    base_dataset += 'ddk'
-    target_dataset += 'ddk'
-elif speech_task == 'lr':
-    base_dataset += 'lr'
-    target_dataset += 'lr'
+base_dataset += '_' + base_speech_task
+target_dataset += '_' + target_speech_task
 
 if recreate_features:
     import get_features
