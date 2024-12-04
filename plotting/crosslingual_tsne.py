@@ -17,40 +17,34 @@ elif os.name == 'posix':  # linux
 elif os.name == 'nt':  # windows
     data_dir = "C:\\Users\INDYD\Documents\RAIVD_data\\"
 
-dataset1 = 'PCGITA'  # NeuroVoz ItalianPD PCGITA
+dataset1 = 'ItalianPD'  # NeuroVoz ItalianPD PCGITA CzechPD
 dataset2 = 'NeuroVoz'
-speech_task = 'ddk'
+dataset3 = 'CzechPD'
+dataset4 = 'PCGITA'
+datasets = [dataset1, dataset2, dataset3,dataset4]
+
+speech_task = 'a'  
 
 ifm_or_nifm = 'ifm'
 
-if speech_task == 'tdu':
-    dataset1 += 'tdu'
-    dataset2 += 'tdu'
-elif speech_task == 'ddk':
-    dataset1 += 'ddk'
-    dataset2 += 'ddk'
+cpals = ['viridis',  'cubehelix', 'magma', 'Spectral']  # 'coolwarm',
 
-# dataset1 += '_norm'
-# dataset2 += '_norm'
+dfs, setnames = [], []
+for dataset in datasets:
+    dataset += '_' + speech_task
 
-df1, n_features = load_data(dataset1, ifm_or_nifm)
-df1['ID'] = dataset1
-df2, n_features = load_data(dataset2, ifm_or_nifm)
-df2['ID'] = dataset2
+    df1, n_features = load_data(dataset, ifm_or_nifm)
+    df1['ID'] = dataset
 
-print(f'{dataset1}: {df1.shape}\n{dataset2}: {df2.shape}')
-print(df1.columns, df2.columns)
+    print(f'{dataset}: {df1.shape}')
+    dfs.append(df1)
+    setnames.append(dataset)
 
-df = pd.concat([df1, df2])
+df = pd.concat(dfs)
 X = df.iloc[:, :n_features].values
+X[np.isnan(X)] = 0
 y = df['y']
 id = df['ID']
-
-print(X.shape, y.shape)
-X[np.isnan(X)] = 0
-
-# scaler = StandardScaler()
-# X = scaler.fit_transform(X)
 
 tsne = TSNE(n_components=2, verbose=0, perplexity=4, max_iter=400)
 tsne_results = tsne.fit_transform(X)
@@ -60,16 +54,16 @@ df['tsne-2d-one'] = tsne_results[:, 0]
 df['tsne-2d-two'] = tsne_results[:, 1]
 df['y'] = y.values
 df['ID'] = id.values
-df2 = df[df['ID']== dataset2] 
-df = df[df['ID']== dataset1] 
 
-plt.figure(figsize=(8, 8))
-ax = sns.scatterplot(x="tsne-2d-one", y="tsne-2d-two", hue="y", palette=sns.color_palette("Blues", 2), data=df, alpha=0.75)
-ax = sns.scatterplot(x="tsne-2d-one", y="tsne-2d-two", hue="y", palette=sns.color_palette("YlOrBr", 2), data=df2, alpha=0.75)
-ax.set(xlabel='First dimension', ylabel='Second dimension', title=f'{dataset1}, {dataset2}: {X.shape[1]} features compressed into two dimensions')
+plt.figure(figsize=(6, 6))
+
+for dataset, cpal in zip(setnames, cpals):
+    cur_df = df[df['ID']== dataset] 
+    ax = sns.scatterplot(x="tsne-2d-one", y="tsne-2d-two", hue="y", palette=sns.color_palette(cpal, 2), data=cur_df, alpha=0.75)
+ax.set(xlabel='First dimension', ylabel='Second dimension', title=f'{setnames}: {X.shape[1]} features compressed into two dimensions')
 
 path = r"C:\Users\INDYD\Dropbox\Uni MSc AI\Master_thesis_RAIVD\imgs"
 if os.path.exists(path): # Only when running on laptop
-    plt.savefig(os.path.join(path,f'tSNE_{ifm_or_nifm}_{dataset1}_{dataset2}_{speech_task}.png'))
-    print("tSNE plot saved to "+f'{path}\_tSNE_{ifm_or_nifm}_{dataset1}_{dataset2}_{speech_task}.png')
+    plt.savefig(os.path.join(path,f'tSNE_{ifm_or_nifm}_{setnames}.png'))
+    print("tSNE plot saved to "+f'{path}\tSNE_{ifm_or_nifm}_{setnames}.png')
 plt.show()
