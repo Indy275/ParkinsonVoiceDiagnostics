@@ -34,7 +34,7 @@ def plot_TL_performance(base_dataset, target_dataset):
     metrics_grouped = pd.read_csv(os.path.join(path, 'experiments', f'{clf_name}_{ifm_or_nifm}_metrics_{base_dataset}_{target_dataset}_grouped.csv'))
     base_metrics = pd.read_csv(os.path.join(path, 'experiments', f'{clf_name}_{ifm_or_nifm}_metrics_{base_dataset}_{target_dataset}_base.csv'))
     mono = pd.read_csv(os.path.join(path, 'experiments', f'monolingual_result.csv'))
-    tgt_mono = mono[(mono['dataset']==target_dataset) & (mono['model']==clf_name) & (mono['ifm_nifm']==ifm_or_nifm)]
+    tgt_mono = mono[(mono['dataset']==target_dataset) & (mono['model']==clf_name[:3]) & (mono['ifm_nifm']==ifm_or_nifm)]
 
     if base_dataset[-3:] != 'tdu' and base_dataset[-3:] != 'ddk':  # file level preds can differ from speaker-level preds!
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
@@ -67,63 +67,78 @@ def plot_TL_performance(base_dataset, target_dataset):
 
 
 def fimp_plot(fimp, df):
-        acoustic_feats = ['F0_mean', 'F0_std','F0_min', 'F0_max', 'dF0_mean', 'ddF0_mean', '%Jitter', 'absJitter', 'RAP', 'PPQ5', 'DDP', '%Shimmer', 'dbShimmer', 'APQ3', 'APQ5', 'APQ11', 'DDA','F1_mean','F2_mean','F3_mean']
-        mfcc_feats = ['mfcc1_mean', 'mfcc2_mean', 'mfcc3_mean', 'mfcc4_mean', 'mfcc5_mean', 'mfcc6_mean', 'mfcc7_mean', 'mfcc8_mean', 'mfcc9_mean', 'mfcc10_mean', 'mfcc11_mean', 'mfcc12_mean', 'mfcc13_mean', 'dmfcc1_mean', 'dmfcc2_mean', 'dmfcc3_mean', 'dmfcc4_mean', 'dmfcc5_mean', 'dmfcc6_mean', 'dmfcc7_mean', 'dmfcc8_mean', 'dmfcc9_mean', 'dmfcc10_mean', 'dmfcc11_mean', 'dmfcc12_mean', 'dmfcc13_mean', 'ddmfcc1_mean', 'ddmfcc2_mean', 'ddmfcc3_mean', 'ddmfcc4_mean', 'ddmfcc5_mean', 'ddmfcc6_mean', 'ddmfcc7_mean', 'ddmfcc8_mean', 'ddmfcc9_mean', 'ddmfcc10_mean', 'ddmfcc11_mean', 'ddmfcc12_mean', 'ddmfcc13_mean', 'mfcc1_std', 'mfcc2_std', 'mfcc3_std', 'mfcc4_std', 'mfcc5_std', 'mfcc6_std', 'mfcc7_std', 'mfcc8_std', 'mfcc9_std', 'mfcc10_std', 'mfcc11_std', 'mfcc12_std', 'mfcc13_std', 'dmfcc1_std', 'dmfcc2_std', 'dmfcc3_std', 'dmfcc4_std', 'dmfcc5_std', 'dmfcc6_std', 'dmfcc7_std', 'dmfcc8_std', 'dmfcc9_std', 'dmfcc10_std', 'dmfcc11_std', 'dmfcc12_std', 'dmfcc13_std', 'ddmfcc1_std', 'ddmfcc2_std', 'ddmfcc3_std', 'ddmfcc4_std', 'ddmfcc5_std', 'ddmfcc6_std', 'ddmfcc7_std', 'ddmfcc8_std', 'ddmfcc9_std', 'ddmfcc10_std', 'ddmfcc11_std', 'ddmfcc12_std', 'ddmfcc13_std', 'mfcc1_skew', 'mfcc2_skew', 'mfcc3_skew', 'mfcc4_skew', 'mfcc5_skew', 'mfcc6_skew', 'mfcc7_skew', 'mfcc8_skew', 'mfcc9_skew', 'mfcc10_skew', 'mfcc11_skew', 'mfcc12_skew', 'mfcc13_skew', 'dmfcc1_skew', 'dmfcc2_skew', 'dmfcc3_skew', 'dmfcc4_skew', 'dmfcc5_skew', 'dmfcc6_skew', 'dmfcc7_skew', 'dmfcc8_skew', 'dmfcc9_skew', 'dmfcc10_skew', 'dmfcc11_skew', 'dmfcc12_skew', 'dmfcc13_skew', 'ddmfcc1_skew', 'ddmfcc2_skew', 'ddmfcc3_skew', 'ddmfcc4_skew', 'ddmfcc5_skew', 'ddmfcc6_skew', 'ddmfcc7_skew', 'ddmfcc8_skew', 'ddmfcc9_skew', 'ddmfcc10_skew', 'ddmfcc11_skew', 'ddmfcc12_skew', 'ddmfcc13_skew', 'mfcc1_kurt', 'mfcc2_kurt', 'mfcc3_kurt', 'mfcc4_kurt', 'mfcc5_kurt', 'mfcc6_kurt', 'mfcc7_kurt', 'mfcc8_kurt', 'mfcc9_kurt', 'mfcc10_kurt', 'mfcc11_kurt', 'mfcc12_kurt', 'mfcc13_kurt', 'dmfcc1_kurt', 'dmfcc2_kurt', 'dmfcc3_kurt', 'dmfcc4_kurt', 'dmfcc5_kurt', 'dmfcc6_kurt', 'dmfcc7_kurt', 'dmfcc8_kurt', 'dmfcc9_kurt', 'dmfcc10_kurt', 'dmfcc11_kurt', 'dmfcc12_kurt', 'dmfcc13_kurt', 'ddmfcc1_kurt', 'ddmfcc2_kurt', 'ddmfcc3_kurt', 'ddmfcc4_kurt', 'ddmfcc5_kurt', 'ddmfcc6_kurt', 'ddmfcc7_kurt', 'ddmfcc8_kurt', 'ddmfcc9_kurt', 'ddmfcc10_kurt', 'ddmfcc11_kurt', 'ddmfcc12_kurt', 'ddmfcc13_kurt']
-        feature_cols = acoustic_feats + mfcc_feats + ['y', 'subject_id', 'sample_id', 'gender']
-        fimp_sorted = sorted(zip(feature_cols, fimp), key=lambda l: l[1], reverse=True)
-        fimp_sorted = [(f0, round(f1, 4)) for f0, f1 in fimp_sorted]
+    acoustic_feats = ['F0_mean', 'F0_std','F0_min', 'F0_max', 'dF0_mean', 'ddF0_mean', '%Jitter', 'absJitter', 'RAP', 'PPQ5', 'DDP', '%Shimmer', 'dbShimmer', 'APQ3', 'APQ5', 'APQ11', 'DDA','F1_mean','F2_mean','F3_mean']
+    mfcc_feats = ['mfcc1_mean', 'mfcc2_mean', 'mfcc3_mean', 'mfcc4_mean', 'mfcc5_mean', 'mfcc6_mean', 'mfcc7_mean', 'mfcc8_mean', 'mfcc9_mean', 'mfcc10_mean', 'mfcc11_mean', 'mfcc12_mean', 'mfcc13_mean', 'dmfcc1_mean', 'dmfcc2_mean', 'dmfcc3_mean', 'dmfcc4_mean', 'dmfcc5_mean', 'dmfcc6_mean', 'dmfcc7_mean', 'dmfcc8_mean', 'dmfcc9_mean', 'dmfcc10_mean', 'dmfcc11_mean', 'dmfcc12_mean', 'dmfcc13_mean', 'ddmfcc1_mean', 'ddmfcc2_mean', 'ddmfcc3_mean', 'ddmfcc4_mean', 'ddmfcc5_mean', 'ddmfcc6_mean', 'ddmfcc7_mean', 'ddmfcc8_mean', 'ddmfcc9_mean', 'ddmfcc10_mean', 'ddmfcc11_mean', 'ddmfcc12_mean', 'ddmfcc13_mean', 'mfcc1_std', 'mfcc2_std', 'mfcc3_std', 'mfcc4_std', 'mfcc5_std', 'mfcc6_std', 'mfcc7_std', 'mfcc8_std', 'mfcc9_std', 'mfcc10_std', 'mfcc11_std', 'mfcc12_std', 'mfcc13_std', 'dmfcc1_std', 'dmfcc2_std', 'dmfcc3_std', 'dmfcc4_std', 'dmfcc5_std', 'dmfcc6_std', 'dmfcc7_std', 'dmfcc8_std', 'dmfcc9_std', 'dmfcc10_std', 'dmfcc11_std', 'dmfcc12_std', 'dmfcc13_std', 'ddmfcc1_std', 'ddmfcc2_std', 'ddmfcc3_std', 'ddmfcc4_std', 'ddmfcc5_std', 'ddmfcc6_std', 'ddmfcc7_std', 'ddmfcc8_std', 'ddmfcc9_std', 'ddmfcc10_std', 'ddmfcc11_std', 'ddmfcc12_std', 'ddmfcc13_std', 'mfcc1_skew', 'mfcc2_skew', 'mfcc3_skew', 'mfcc4_skew', 'mfcc5_skew', 'mfcc6_skew', 'mfcc7_skew', 'mfcc8_skew', 'mfcc9_skew', 'mfcc10_skew', 'mfcc11_skew', 'mfcc12_skew', 'mfcc13_skew', 'dmfcc1_skew', 'dmfcc2_skew', 'dmfcc3_skew', 'dmfcc4_skew', 'dmfcc5_skew', 'dmfcc6_skew', 'dmfcc7_skew', 'dmfcc8_skew', 'dmfcc9_skew', 'dmfcc10_skew', 'dmfcc11_skew', 'dmfcc12_skew', 'dmfcc13_skew', 'ddmfcc1_skew', 'ddmfcc2_skew', 'ddmfcc3_skew', 'ddmfcc4_skew', 'ddmfcc5_skew', 'ddmfcc6_skew', 'ddmfcc7_skew', 'ddmfcc8_skew', 'ddmfcc9_skew', 'ddmfcc10_skew', 'ddmfcc11_skew', 'ddmfcc12_skew', 'ddmfcc13_skew', 'mfcc1_kurt', 'mfcc2_kurt', 'mfcc3_kurt', 'mfcc4_kurt', 'mfcc5_kurt', 'mfcc6_kurt', 'mfcc7_kurt', 'mfcc8_kurt', 'mfcc9_kurt', 'mfcc10_kurt', 'mfcc11_kurt', 'mfcc12_kurt', 'mfcc13_kurt', 'dmfcc1_kurt', 'dmfcc2_kurt', 'dmfcc3_kurt', 'dmfcc4_kurt', 'dmfcc5_kurt', 'dmfcc6_kurt', 'dmfcc7_kurt', 'dmfcc8_kurt', 'dmfcc9_kurt', 'dmfcc10_kurt', 'dmfcc11_kurt', 'dmfcc12_kurt', 'dmfcc13_kurt', 'ddmfcc1_kurt', 'ddmfcc2_kurt', 'ddmfcc3_kurt', 'ddmfcc4_kurt', 'ddmfcc5_kurt', 'ddmfcc6_kurt', 'ddmfcc7_kurt', 'ddmfcc8_kurt', 'ddmfcc9_kurt', 'ddmfcc10_kurt', 'ddmfcc11_kurt', 'ddmfcc12_kurt', 'ddmfcc13_kurt']
+    feature_cols = acoustic_feats + mfcc_feats + ['y', 'subject_id', 'sample_id', 'gender', 'dataset']
+    fimp_sorted = sorted(zip(feature_cols, fimp), key=lambda l: l[1], reverse=True)
+    fimp_sorted = [(f0, round(f1, 4)) for f0, f1 in fimp_sorted]
 
-        print([f0 for f0,f1 in fimp_sorted[:20] if f1 > 0.025])
+    print([f0 for f0,f1 in fimp_sorted[:20] if f1 > 0.015])
 
-        # [6, 5, 6, 3, 156]
-        fl = [0, 6, 11, 17, 20, 176]
-        f0_features = [x for x in range(fl[0], fl[1])]
-        jitter_features = [x for x in range(fl[1], fl[2])]
-        shimmer_features = [x for x in range(fl[2], fl[3])]
-        formant_features = [x for x in range(fl[3], fl[4])]
-        mfcc_features = [x for x in range(fl[4], fl[5])]
+    # [6, 5, 6, 3, 156]
+    fl = [0, 6, 11, 17, 20, 176]
+    f0_features = [x for x in range(fl[0], fl[1])]
+    jitter_features = [x for x in range(fl[1], fl[2])]
+    shimmer_features = [x for x in range(fl[2], fl[3])]
+    formant_features = [x for x in range(fl[3], fl[4])]
+    mfcc_features = [x for x in range(fl[4], fl[5])]
 
-        sum_f0, sum_jit, sum_shim, sum_form, sum_mfcc = 0, 0,0,0,0
-        for i, value in enumerate(fimp):
-            if i in f0_features:
-                sum_f0 += abs(value)
-            if i in jitter_features:
-                sum_jit += abs(value)
-            if i in shimmer_features:
-                sum_shim += abs(value)
-            if i in formant_features:
-                sum_form += abs(value)
-            if i in mfcc_features:
-                sum_mfcc += abs(value)
+    sum_f0, sum_jit, sum_shim, sum_form, sum_mfcc = 0, 0,0,0,0
+    for i, value in enumerate(fimp):
+        if i in f0_features:
+            sum_f0 += abs(value)
+        if i in jitter_features:
+            sum_jit += abs(value)
+        if i in shimmer_features:
+            sum_shim += abs(value)
+        if i in formant_features:
+            sum_form += abs(value)
+        if i in mfcc_features:
+            sum_mfcc += abs(value)
 
-        print("Contribution of F0: {:.3f} (avg: {:.3f})".format(sum_f0, sum_f0/len(f0_features)))
-        # sum_jit = sum(val for key, val in fimp if key in jitter_features)
-        print("Contribution of Jitter: {:.3f} (avg: {:.3f})".format(sum_jit, sum_jit/len(jitter_features)))
-        # sum_shim = sum(val for key, val in fimp if key in shimmer_features)
-        print("Contribution of Shimmer: {:.3f} (avg: {:.3f})".format(sum_shim, sum_shim/len(shimmer_features)))
-        # sum_form = sum(val for key, val in fimp if key in formant_features)
-        print("Contribution of formants: {:.3f} (avg: {:.3f})".format(sum_form, sum_form/len(formant_features)))
-        # sum_mfcc = sum(val for key, val in fimp if key in mfcc_features)
-        print("Contribution of MFCC: {:.3f} (avg: {:.3f})".format(sum_mfcc, sum_mfcc/len(mfcc_features)))
-        print("Total feature importance (should equal to 1):", sum_mfcc + sum_f0 + sum_form + sum_jit + sum_shim)
+    print("Contribution of F0: {:.3f} (avg: {:.3f})".format(sum_f0, sum_f0/len(f0_features)))
+    # sum_jit = sum(val for key, val in fimp if key in jitter_features)
+    print("Contribution of Jitter: {:.3f} (avg: {:.3f})".format(sum_jit, sum_jit/len(jitter_features)))
+    # sum_shim = sum(val for key, val in fimp if key in shimmer_features)
+    print("Contribution of Shimmer: {:.3f} (avg: {:.3f})".format(sum_shim, sum_shim/len(shimmer_features)))
+    # sum_form = sum(val for key, val in fimp if key in formant_features)
+    print("Contribution of formants: {:.3f} (avg: {:.3f})".format(sum_form, sum_form/len(formant_features)))
+    # sum_mfcc = sum(val for key, val in fimp if key in mfcc_features)
+    print("Contribution of MFCC: {:.3f} (avg: {:.3f})".format(sum_mfcc, sum_mfcc/len(mfcc_features)))
+    print("Total feature importance (should equal to 1):", sum_mfcc + sum_f0 + sum_form + sum_jit + sum_shim)
 
-        plt.barh(df.columns[fl[0]:fl[1]], fimp[fl[0]:fl[1]], color='green')
-        plt.barh(df.columns[fl[1]:fl[2]], fimp[fl[1]:fl[2]], color='blue')
-        plt.barh(df.columns[fl[2]:fl[3]], fimp[fl[2]:fl[3]], color='red')
-        plt.barh(df.columns[fl[3]:fl[4]], fimp[fl[3]:fl[4]], color='purple')
-        # plt.barh(df.columns[fl[4]:fl[5]], fimp[fl[4]:fl[5]], color='orange')
+    plt.barh(df.columns[fl[0]:fl[1]], fimp[fl[0]:fl[1]], color='green')
+    plt.barh(df.columns[fl[1]:fl[2]], fimp[fl[1]:fl[2]], color='blue')
+    plt.barh(df.columns[fl[2]:fl[3]], fimp[fl[2]:fl[3]], color='red')
+    plt.barh(df.columns[fl[3]:fl[4]], fimp[fl[3]:fl[4]], color='purple')
+    # plt.barh(df.columns[fl[4]:fl[5]], fimp[fl[4]:fl[5]], color='orange')
 
-        plt.barh(df.columns[fl[4]:fl[4]+39], fimp[fl[4]:fl[4]+39], color='green')
-        plt.barh(df.columns[fl[4]+39:fl[4]+39+39], fimp[fl[4]+39:fl[4]+39+39], color='blue')
-        plt.barh(df.columns[fl[4]+39+39:fl[4]+78+39], fimp[fl[4]+39+39:fl[4]+78+39], color='red')
-        plt.barh(df.columns[fl[4]+78+39:fl[4]+78+78], fimp[fl[4]+78+39:fl[4]+78+78], color='orange')
 
-        plt.yticks(
-            [(fl[0] + fl[1]) / 2, (fl[1] + fl[2]) / 2, (fl[2] + fl[3]) / 2, (fl[3] + fl[4]) / 2, (fl[4] + fl[5]) / 2],
-            ['F0', 'Jitter', 'Shimmer', 'Formants', 'MFCC'])
-        plt.xlabel("Relative feature importance")
-        plt.tight_layout()
-        plt.ylim((fl[0], fl[-1]))
-        plt.show()
+    plt.barh(df.columns[fl[4]:fl[4]+39], fimp[fl[4]:fl[4]+39], color='green')
+    plt.barh(df.columns[fl[4]+39:fl[4]+39+39], fimp[fl[4]+39:fl[4]+39+39], color='blue')
+    plt.barh(df.columns[fl[4]+39+39:fl[4]+78+39], fimp[fl[4]+39+39:fl[4]+78+39], color='red')
+    plt.barh(df.columns[fl[4]+78+39:fl[4]+78+78], fimp[fl[4]+78+39:fl[4]+78+78], color='orange')
 
-    
+    plt.yticks(
+        [(fl[0] + fl[1]) / 2, (fl[1] + fl[2]) / 2, (fl[2] + fl[3]) / 2, (fl[3] + fl[4]) / 2, (fl[4] + fl[5]) / 2],
+        ['F0', 'Jitter', 'Shimmer', 'Formants', 'MFCC'])
+    plt.xlabel("Relative feature importance")
+    plt.tight_layout()
+    plt.ylim((fl[0], fl[-1]))
+
+    plt.show()
+
+def fimp_plot_nifm(fimp, df):
+    nifm_features = list(range(df.shape[1]-5))
+    feature_cols = nifm_features + ['y', 'subject_id', 'sample_id', 'gender', 'dataset']
+    fimp_sorted = sorted(zip(feature_cols, fimp), key=lambda l: l[1], reverse=True)
+    fimp_sorted = [(f0, round(f1, 4)) for f0, f1 in fimp_sorted]
+
+    print(sorted([f0 for f0,f1 in fimp_sorted[:20] if f1 > 0.015]))
+
+    plt.barh(df.columns[:len(nifm_features)], fimp, color='green')
+
+    plt.xlabel("Relative feature importance")
+    plt.tight_layout()
+
+    # plt.show()
