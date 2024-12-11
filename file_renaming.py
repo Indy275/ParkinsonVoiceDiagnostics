@@ -137,9 +137,10 @@ def rename_czech_files():
                     int(''.join(re.findall(r'\d+', file[2:4])))) + '.wav'
             shutil.copy(os.path.join(dir, file), os.path.join(modified_dir, new_fname))
 
-def czech_gender():
+def fake_gender():
+    dataset = 'MDVR'
     # czech data is lacking gender, so create a file with all zeroes
-    dir = data_dir + "CzechPD\\records_a_norm\\"
+    dir = data_dir + dataset + "\\records_tdu_norm\\"
     ids = []
     for file in os.listdir(dir):
         ids.append(file[-8:-4])
@@ -147,7 +148,7 @@ def czech_gender():
 
     df = pd.DataFrame(data=ids, columns=['ID'])
     df['Sex'] = 0
-    df.to_csv(os.path.join(data_dir, 'CzechPD', 'gender.csv'), index=False)
+    df.to_csv(os.path.join(data_dir, dataset, 'gender.csv'), index=False)
 
 ############################### IPVS ###############################
 
@@ -231,6 +232,21 @@ def read_turkish_df():
     # for i in range(0, len(df.columns), n ):
     #     print(df.columns[i:i+n])
     df.to_csv(os.path.join(data_dir, 'preprocessed_data', 'TurkishPD_tdu_norm_ifm.csv'), index=False)
+
+############################### MDVR-KCL ###############################
+
+def rename_mdvr():
+    modified_dir = data_dir + "MDVR\\records_tdu"
+    condition = ['PD', 'HC']
+    for c in condition:
+        audio_dir = data_dir  + "MDVR\\ReadText\\" + c
+        for audio_file in os.listdir(audio_dir):
+            audio = AudioSegment.from_wav(os.path.join(audio_dir,audio_file))
+            audio_segment = audio[40000:100000]
+            output_fname = os.path.join(modified_dir, f"{c}_TDU_00{audio_file[2:4]}")
+            print(output_fname)
+            audio_segment.export(output_fname+'.wav', format='wav')
+
 ############################### Other functions ###############################
 
 def downsample(dataset, target_sample_rate=16000):
@@ -266,9 +282,9 @@ def modify_orig_id(row):
 
 def combine_rows():
     data1 = 'NeuroVoz'
-    data2 = 'PCGITA'
-    data3 =  'CzechPD'
-    datasets = '_a_norm_ifm'
+    data2 = 'MDVR'
+    data3 =  'PCGITA'
+    datasets = '_tdu_norm_ifm'
     store_location = os.path.join(data_dir, 'preprocessed_data')
     df = pd.read_csv(os.path.join(store_location, f'{data1}{datasets}.csv'))
     df2 = pd.read_csv(os.path.join(store_location, f'{data2}{datasets}.csv'))
@@ -286,7 +302,9 @@ def combine_rows():
         dfname = f'{data1}{data2}{datasets}.csv'
     print(df_all.columns, df_all.shape)
     df_all.to_csv(os.path.join(store_location,dfname), index=False)
-combine_rows()
+
+# combine_rows()
+
 def combine_columns():
     store_location = os.path.join(data_dir, 'preprocessed_data')
     df = pd.read_csv(os.path.join(store_location, 'NeuroVoztdu_ifm.csv'))
@@ -318,18 +336,19 @@ def preprocess():
 
 
 def getfeats():
-    # feats = [[('mfcc3_skew', 0.1019), ('ddmfcc3_std', 0.0581), ('mfcc8_mean', 0.0563), ('mfcc9_mean', 0.0532), ('ddmfcc1_mean', 0.051), ('mfcc10_mean', 0.0475)],
-    #         [('PPQ5', 0.0581), ('ddmfcc12_std', 0.0525), ('absJitter', 0.0501), ('ddmfcc2_std', 0.0483), ('dmfcc2_kurt', 0.045), ('ddmfcc11_std', 0.0449)],
-    #         [('ddmfcc1_kurt', 0.0541), ('ddmfcc4_std', 0.0523), ('RAP', 0.0448), ('ddmfcc7_std', 0.0421), ('ddmfcc12_std', 0.042)],
-    #         [('RAP', 0.0522), ('dmfcc7_kurt', 0.0501), ('ddmfcc10_std', 0.0441), ('ddmfcc1_kurt', 0.042), ('PPQ5', 0.04)],
-    #         [('ddmfcc1_std', 0.0522), ('ddmfcc12_std', 0.0502), ('ddmfcc2_std', 0.0466), ('RAP', 0.046), ('ddmfcc3_std', 0.0444)]
-    # ]
+    feats = [['dmfcc1_mean', 'dF0_mean', 'dmfcc9_mean', 'ddmfcc8_std', 'dmfcc8_std', 'dmfcc7_std', 'dmfcc11_std', 'ddmfcc4_std', 'dbShimmer', 'ddmfcc4_kurt', 'mfcc5_mean', 'ddmfcc9_std', 'ddmfcc11_std', 'APQ5', 'ddmfcc10_mean', 'APQ11', 'dmfcc4_std'],
+['APQ3', 'DDA', 'APQ5', 'mfcc7_mean', 'dmfcc3_skew', 'mfcc9_mean', 'mfcc8_mean', 'mfcc6_mean', 'mfcc10_mean', '%Shimmer', 'mfcc9_std', 'mfcc4_mean', 'mfcc11_mean', 'mfcc1_mean', 'ddmfcc4_std', 'dbShimmer'],
+['dmfcc1_mean', 'dmfcc2_mean', 'dF0_mean', 'dmfcc2_skew', 'dmfcc7_std', 'dmfcc9_mean', 'dmfcc8_std', 'dmfcc5_mean', 'APQ11', 'mfcc8_std', 'dmfcc4_std', 'dmfcc3_mean']
+    ]
     # feats = [[('dmfcc13_skew', 0.0), ('ddmfcc2_skew', 0.0), ('ddmfcc5_skew', 0.0), ('ddmfcc6_skew', 0.0), ('ddmfcc7_skew', 0.0), ('ddmfcc8_skew', 0.0), ('ddmfcc9_skew', 0.0), ('ddmfcc10_skew', 0.0), ('ddmfcc11_skew', 0.0), ('ddmfcc12_skew', 0.0), ('ddmfcc13_skew', 0.0), ('mfcc2_kurt', 0.0), ('mfcc4_kurt', 0.0), ('mfcc5_kurt', 0.0), ('mfcc6_kurt', 0.0), ('mfcc8_kurt', 0.0), ('mfcc10_kurt', 0.0), ('mfcc11_kurt', 0.0), ('ddmfcc12_kurt', 0.0), ('ddmfcc13_kurt', 0.0)],
     #         [('ddmfcc7_skew', 0.0), ('ddmfcc8_skew', 0.0), ('ddmfcc9_skew', 0.0), ('ddmfcc10_skew', 0.0), ('ddmfcc11_skew', 0.0), ('ddmfcc12_skew', 0.0), ('ddmfcc13_skew', 0.0), ('mfcc2_kurt', 0.0), ('mfcc4_kurt', 0.0), ('mfcc5_kurt', 0.0), ('mfcc6_kurt', 0.0), ('mfcc7_kurt', 0.0), ('mfcc8_kurt', 0.0), ('mfcc9_kurt', 0.0), ('mfcc10_kurt', 0.0), ('mfcc11_kurt', 0.0), ('mfcc12_kurt', 0.0), ('mfcc13_kurt', 0.0), ('dmfcc10_kurt', 0.0), ('ddmfcc11_kurt', 0.0)],
     #         [('ddmfcc3_skew', 0.0), ('ddmfcc4_skew', 0.0), ('ddmfcc5_skew', 0.0), ('ddmfcc7_skew', 0.0), ('ddmfcc8_skew', 0.0), ('ddmfcc9_skew', 0.0), ('ddmfcc10_skew', 0.0), ('ddmfcc13_skew', 0.0), ('mfcc3_kurt', 0.0), ('mfcc4_kurt', 0.0), ('mfcc5_kurt', 0.0), ('mfcc6_kurt', 0.0), ('mfcc7_kurt', 0.0), ('mfcc9_kurt', 0.0), ('mfcc10_kurt', 0.0), ('mfcc11_kurt', 0.0), ('mfcc12_kurt', 0.0), ('mfcc13_kurt', 0.0), ('dmfcc12_kurt', 0.0), ('dmfcc13_kurt', 0.0)]
     #         ]
-    feats = [[('ddmfcc3_skew', 0.0628), ('mfcc2_skew', 0.0571), ('mfcc1_skew', 0.0444), ('mfcc2_kurt', 0.0401), ('ddmfcc3_kurt', 0.0293), ('mfcc3_kurt', 0.0291)]]
-
+    from collections import Counter
+    combined = [item for lst in feats for item in lst]  # Flatten all lists into one
+    element_counts = Counter(combined)  # Count occurrences of each element
+    common_elements = [item for item, count in element_counts.items() if count > 1]
+    print(common_elements)
 
     dic = defaultdict(list)
     for f in feats:
@@ -346,6 +365,7 @@ def getfeats():
             print(k, len(v), np.mean(v))
             lis.append(k)
     print(lis)
+
 
 def add_dataset_col():
     store_location = os.path.join(data_dir, 'preprocessed_data')
