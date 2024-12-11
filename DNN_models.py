@@ -148,29 +148,33 @@ def create_cnn_model():
 def create_ResNet_model():
     model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
     for params in model.parameters():
-            params.requires_grad = False
-
-    for param in model.layer4.parameters():
-        param.requires_grad = True
-    for param in model.fc.parameters():
-        param.requires_grad = True
+            params.requires_grad = True
+            
+    # for params in model.parameters():
+    #         params.requires_grad = False
+    # for param in model.layer4.parameters():
+    #     param.requires_grad = True
+    # for param in model.fc.parameters():
+    #     param.requires_grad = True
 
     model.fc = nn.Linear(model.fc.in_features, 2)
-    optimizer = optim.AdamW(model.parameters(), lr=0.0001)
+    optimizer = optim.AdamW(model.parameters(), lr=0.001)
     scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=500, gamma=0.6)
     criterion = nn.CrossEntropyLoss()
     return model, optimizer, scheduler, criterion
 
 
-def train_model(model, optimizer, scheduler, criterion, train_loader, num_epochs=20):
+def train_model(model, optimizer, scheduler, criterion, train_loader, num_epochs=10):
     for epoch in range(num_epochs):
         model.train()
+        acc = []
         
         for batch_data, batch_labels in train_loader:
             optimizer.zero_grad()  # Reset gradients
             outputs = model(batch_data)  # Get model predictions
             # print(batch_data.shape, outputs.shape, batch_labels.shape)
             loss = criterion(outputs, batch_labels)  # Compute the loss
+            
             # print(outputs, batch_labels, loss)
             loss.backward()  # Compute gradients
             optimizer.step()  # Update model weights
@@ -180,7 +184,9 @@ def train_model(model, optimizer, scheduler, criterion, train_loader, num_epochs
             print(f'Epoch [{epoch+1}/{num_epochs}]: Loss: {loss.item():.4f}, lr:', round(optimizer.param_groups[0]['lr'],5))
 
 
-def get_X_y(df, n_features, modeltype):
+def get_X_y(df, modeltype):
+    n_features = len(df.columns) - 5  # Ugly coding, but does the trick: all columns except last 4 are features
+
     if modeltype.startswith('DNNC'):
         df_grouped = df.groupby('sample_id')
         X = np.array([group.values for _, group in df_grouped])[:, :, :n_features].astype(float)
@@ -192,19 +198,18 @@ def get_X_y(df, n_features, modeltype):
         X = torch.tensor(df.loc[:, df.columns[:n_features]].values).to(torch.float32)
         y = torch.tensor(df.loc[:, 'y'].values)
         df_new = df
-    return df_new, X, y 
+    return df_new, X, y, n_features
 
 def run_dnn_model(modeltype, train_df, test_df):
-    n_features = len(train_df.columns) - 5  # Ugly coding, but does the trick: all columns except last 4 are features
 
     # Get base train data
-    train_df, X_train, y_train = get_X_y(train_df, n_features, modeltype)
+    train_df, X_train, y_train, n_features = get_X_y(train_df, modeltype)
     train_dataset = TensorDataset(X_train,y_train)
     train_loader = DataLoader(train_dataset, shuffle=True)
 
     # Create model
     if modeltype.startswith('DNNC'):
-        # base_model, optimizer, scheduler, criterion = create_cnn_model()
+        # model, optimizer, scheduler, criterion = create_cnn_model()
         model, optimizer, scheduler, criterion = create_ResNet_model()
     else:
         model, optimizer, scheduler, criterion = create_dnn_model(n_features)
@@ -214,7 +219,7 @@ def run_dnn_model(modeltype, train_df, test_df):
     torch.save(model.state_dict(), 'DNNmodel')
 
     # Evaluation
-    test_df, X_test, y_test = get_X_y(test_df, n_features, modeltype)
+    test_df, X_test, y_test, _ = get_X_y(test_df, modeltype)
 
     model.eval()
     with torch.no_grad():
@@ -229,28 +234,26 @@ def run_dnn_model(modeltype, train_df, test_df):
 
 
 def run_dnn_tl_model(scaler, modeltype, base_train_df, base_test_df, tgt_df):
-    n_features = len(base_train_df.columns) - 5  # Ugly coding, but does the trick: all columns except last 4 are features
-
     # Get base train data
-    base_train_df, base_X_train, base_y_train = get_X_y(base_train_df, n_features, modeltype)
+    base_train_df, base_X_train, base_y_train, n_features = get_X_y(base_train_df, modeltype)
     base_dataset = TensorDataset(base_X_train, base_y_train)
     base_loader = DataLoader(base_dataset, shuffle=True)
 
     # Create model
     if modeltype.startswith('DNNC'):
-        base_model, optimizer, scheduler, criterion = create_cnn_model()
-        # base_model, optimizer, scheduler, criterion = create_ResNet_model()
+        # base_model, optimizer, scheduler, criterion = create_cnn_model()
+        base_model, optimizer, scheduler, criterion = create_ResNet_model()
     else:
         base_model, optimizer, scheduler, criterion = create_dnn_model(n_features)
 
     # Train model on base train data
     train_model(base_model, optimizer, scheduler, criterion, base_loader)
 
-    for params in base_model.parameters():
-            params.requires_grad = False
-    for p in [base_model.fc1,base_model.fc2,base_model.fc3]:
-        for param in p.parameters():
-            param.requires_grad = True
+    # for params in base_model.parameters():
+    #         params.requires_grad = False
+    # for p in [base_model.fc1,base_model.fc2,base_model.fc3]:
+    #     for param in p.parameters():
+    #         param.requires_grad = True
 
     metrics_list, metrics_grouped, base_metrics = [], [], []
     tgt_df_split = tgt_df.drop_duplicates(['subject_id'])
@@ -268,24 +271,24 @@ def run_dnn_tl_model(scaler, modeltype, base_train_df, base_test_df, tgt_df):
         
         train_subjects = tgt_df_split.iloc[train_split_indices]['subject_id']
         test_subjects = tgt_df_split.iloc[test_split_indices]['subject_id']
-        train_tgt_df = tgt_df_copy[tgt_df_copy['subject_id'].isin(train_subjects)]
-        test_tgt_df = tgt_df_copy[tgt_df_copy['subject_id'].isin(test_subjects)]
+        tgt_train_df = tgt_df_copy[tgt_df_copy['subject_id'].isin(train_subjects)]
+        tgt_test_df = tgt_df_copy[tgt_df_copy['subject_id'].isin(test_subjects)]
 
         # Add target train data to scaler fit
-        scaler_copy.partial_fit(train_tgt_df.iloc[:, :n_features].values) 
-        train_tgt_df.iloc[:, :n_features] = scaler_copy.transform(train_tgt_df.iloc[:, :n_features].values)
-        test_tgt_df.iloc[:, :n_features] = scaler_copy.transform(test_tgt_df.iloc[:, :n_features].values)
+        scaler_copy.partial_fit(tgt_train_df.iloc[:, :n_features].values) 
+        tgt_train_df.iloc[:, :n_features] = scaler_copy.transform(tgt_train_df.iloc[:, :n_features].values)
+        tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)
         
-        tgt_train_df, tgt_X_train, tgt_y_train = get_X_y(train_tgt_df, n_features, modeltype)
+        tgt_train_df, tgt_X_train, tgt_y_train, _ = get_X_y(tgt_train_df, modeltype)
         tgt_dataset = TensorDataset(tgt_X_train, tgt_y_train)
         tgt_loader = DataLoader(tgt_dataset, shuffle=True)
         
         # Fine-tune model
-        train_model(model, optimizer, scheduler, criterion, tgt_loader, num_epochs=10)
+        train_model(model, optimizer, scheduler, criterion, tgt_loader, num_epochs=5)
 
         # Prepare test data
-        tgt_test_df, tgt_X_test, tgt_y_test = get_X_y(test_tgt_df, n_features, modeltype)
-        base_test_df, base_X_test, base_y_test = get_X_y(base_test_df, n_features, modeltype)
+        tgt_test_df, tgt_X_test, tgt_y_test, _ = get_X_y(tgt_test_df, modeltype)
+        base_test_df, base_X_test, base_y_test, _ = get_X_y(base_test_df, modeltype)
 
         # Evaluation
         model.eval()
@@ -306,35 +309,36 @@ def run_dnn_tl_model(scaler, modeltype, base_train_df, base_test_df, tgt_df):
     return zip(*[metrics_list, metrics_grouped, base_metrics])
 
 
-def run_dnn_fstl_model(scaler, modeltype, base_train_df, base_df, tgt_df):
-    n_features = len(base_train_df.columns) - 5  # Ugly coding, but does the trick: all columns except last 4 are features
-
+def run_dnn_fstl_model(scaler, modeltype, base_train_df, base_test_df, tgt_df):
     # Get base train data
-    base_train_df, base_X_train, base_y_train = get_X_y(base_train_df, n_features, modeltype)
+    base_train_df, base_X_train, base_y_train, n_features = get_X_y(base_train_df, modeltype)
     base_dataset = TensorDataset(base_X_train, base_y_train)
     base_loader = DataLoader(base_dataset, shuffle=True)
 
     # Create model
     if modeltype.startswith('DNNC'):
         base_model, optimizer, scheduler, criterion = create_cnn_model()
-        base_model, optimizer, scheduler, criterion = create_ResNet_model()
+        # base_model, optimizer, scheduler, criterion = create_ResNet_model()
     else:
         base_model, optimizer, scheduler, criterion = create_dnn_model(n_features)
 
     # Train model on base train data
-    # train_model(base_model, optimizer, scheduler, criterion, base_loader)
+    train_model(base_model, optimizer, scheduler, criterion, base_loader)
     # base_model.load_state_dict(torch.load('DNNmodel', weights_only=True))
 
     # Prepare data for few-shot fine-tuning
-    base_pos_subjs = list(base_df[base_df['y'] == 1]['subject_id'].unique())
-    base_neg_subjs = list(base_df[base_df['y'] == 0]['subject_id'].unique())
+    base_pos_subjs = list(base_test_df[base_test_df['y'] == 1]['subject_id'].unique())
+    base_neg_subjs = list(base_test_df[base_test_df['y'] == 0]['subject_id'].unique())
     pos_subjs = list(tgt_df[tgt_df['y'] == 1]['subject_id'].unique())
     neg_subjs = list(tgt_df[tgt_df['y'] == 0]['subject_id'].unique())
-    max_shot = min(len(pos_subjs), len(neg_subjs)) - 3  # Keep at least 3 pos and neg samples for evaluation
-    
+    max_shot = min(len(pos_subjs), len(neg_subjs)) - 1  # Keep at least 1 pos and neg samples for evaluation
+    max_shot = 3
+
     metrics_list, metrics_grouped, base_metrics, n_tgt_train_samples = [], [], [], []
     seed = int(random.random()*10000)
-    for n_shots in range(max_shot+1):
+    for n_shots in range(0, max_shot+1):
+        base_test_df_copy = deepcopy(base_test_df)
+        tgt_test_df = deepcopy(tgt_df)
         scaler_copy = deepcopy(scaler)
         model = deepcopy(base_model)
         model.load_state_dict(base_model.state_dict())
@@ -343,48 +347,45 @@ def run_dnn_fstl_model(scaler, modeltype, base_train_df, base_df, tgt_df):
 
         if n_shots > 0:
             # Fine-tune model with pos and neg samples from base and target set
-            base_train_df, base_test_df = get_samples(seed, base_pos_subjs, base_neg_subjs, max(1, int(n_shots)), base_df)
+            n_base_samples = int(max(1, min(n_shots/2, len(base_pos_subjs) -3, len(base_neg_subjs) -3)))
+            # base_train_df, base_test_df = get_samples(seed, base_pos_subjs, base_neg_subjs, n_base_samples, base_train_df)
             tgt_train_df, tgt_test_df = get_samples(seed, pos_subjs, neg_subjs, n_shots, tgt_df)
 
             # Add target train data to scaler fit
             scaler_copy.partial_fit(tgt_train_df.iloc[:, :n_features].values) 
             tgt_train_df.iloc[:, :n_features] = scaler_copy.transform(tgt_train_df.iloc[:, :n_features].values).astype(float)
-            tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values).astype(float)
-
-            tgt_train_df = pd.concat([tgt_train_df, base_train_df], ignore_index=True, axis=0)
+            
+            # Concatenate train data
+            # tgt_train_df = pd.concat([tgt_train_df, base_train_df], ignore_index=True, axis=0)
 
             # Get target train data
-            tgt_train_df, tgt_X_train, tgt_y_train = get_X_y(tgt_train_df, n_features, modeltype)
+            tgt_train_df, tgt_X_train, tgt_y_train, _ = get_X_y(tgt_train_df, modeltype)
             tgt_dataset = TensorDataset(tgt_X_train, tgt_y_train)
             tgt_loader = DataLoader(tgt_dataset, shuffle=True)
 
             # Fine-tune model using target data
-            train_model(model, optimizer, scheduler, criterion, tgt_loader, num_epochs=8)
-        else: # n_shots == 0
-            # Use entire tgt set for evaluation
-            base_test_df = deepcopy(base_df)
-            tgt_test_df = deepcopy(tgt_df)
-            tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values).astype(float)
+            train_model(model, optimizer, scheduler, criterion, tgt_loader, num_epochs=5)
         
-        # Evaluation
-        tgt_test_df, tgt_X_test, tgt_y_test = get_X_y(tgt_test_df, n_features, modeltype)
-        base_test_df, base_X_test, base_y_test = get_X_y(base_test_df, n_features, modeltype)
+        # Prepare data for evaluation
+        tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values).astype(float)
+        tgt_test_df, tgt_X_test, tgt_y_test, _ = get_X_y(tgt_test_df, modeltype)
+        base_test_df_copy, base_X_test, base_y_test, _ = get_X_y(base_test_df_copy, modeltype)
 
+        # Evaluate model
         model.eval()
         with torch.no_grad():
             base_preds = model(base_X_test)
             tgt_preds = model(tgt_X_test)
             _, base_predicted = torch.max(base_preds.data, 1)
             _, tgt_predicted = torch.max(tgt_preds.data, 1)
+        base_test_df_copy.loc[:, 'preds'] = base_predicted.numpy()
         tgt_test_df.loc[:, 'preds'] = tgt_predicted.numpy()
-        base_test_df.loc[:, 'preds'] = base_predicted.numpy()
 
-
-        all_metrics = evaluate_predictions(f'DNN ({n_shots} shots)', tgt_y_test, tgt_test_df, base_y_test, base_test_df)
+        all_metrics = evaluate_predictions(f'DNN ({n_shots} shots)', tgt_y_test, tgt_test_df, base_y_test, base_test_df_copy)
         metrics, grouped, base = zip(*all_metrics)
         metrics_list.append(metrics)
         metrics_grouped.append(grouped)
         base_metrics.append(base)
         n_tgt_train_samples.append(n_shots)
-        
+
     return zip(*[metrics_list, metrics_grouped, base_metrics, n_tgt_train_samples])
