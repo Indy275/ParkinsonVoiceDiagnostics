@@ -136,22 +136,14 @@ def get_spectrograms(file_path):
     if len(y) < audio_length+start_time:
             y = np.pad(y, int(np.ceil((start_time+audio_length - len(y))/2)))
     y = y[start_time:start_time+audio_length]
+    mels = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=512, hop_length=64, n_mels=65)
+    mels_db = librosa.power_to_db(mels, ref=np.max)
+    mels_db = (mels_db - mels_db.mean()) / mels_db.std()
 
-    spectrogram = librosa.feature.melspectrogram(y=y, sr=sr, n_mels=80) #n_fft=256, hop_length=64, n_mels=80)
-    spectrogram_db = librosa.power_to_db(spectrogram, ref=np.max)
-    # print("mine", spectrogram_db.shape)
     # fig, ax = plt.subplots()
-    # img = display.specshow(spectrogram_db, y_axis='mel', x_axis='time', ax=ax)
+    # img = display.specshow(mels_db, y_axis='mel', x_axis='time', ax=ax)
     # ax.set(title='Mel spectrogram display')
     # fig.colorbar(img, ax=ax, format="%+2.f dB")
     # plt.show()
-    # y, sr = librosa.load(file_path, sr=sr)  
-    # fig, ax = plt.subplots()
-    # M = librosa.feature.melspectrogram(y=y, sr=sr)
-    # M_db = librosa.power_to_db(M, ref=np.max)
-    # print("theirs",M_db.shape)
-    # img = librosa.display.specshow(M_db, y_axis='mel', x_axis='time', ax=ax)
-    # ax.set(title='Mel spectrogram display')
-    # fig.colorbar(img, ax=ax, format="%+2.f dB")
-    # plt.show()
-    return spectrogram_db.T
+
+    return mels_db.T

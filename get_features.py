@@ -14,7 +14,6 @@ def save_intermediate_results(X, y, subj_id, sample_id, gender, dataset_id, ifm_
     sample_id = np.array(sample_id).reshape(-1, 1)
     gender = np.array(gender).reshape(-1, 1)
     dataset_id = np.array(dataset_id).reshape(-1, 1)
-
     data = np.hstack((X, y, subj_id, sample_id, gender, dataset_id))
     if ifm_nifm.startswith('ifm'):
         acoustic_feats = ['F0_mean', 'F0_std','F0_min', 'F0_max', 'dF0_mean', 'ddF0_mean', '%Jitter', 'absJitter', 'RAP', 'PPQ5', 'DDP', '%Shimmer', 'dbShimmer', 'APQ3', 'APQ5', 'APQ11', 'DDA','F1_mean','F2_mean','F3_mean']
@@ -24,9 +23,9 @@ def save_intermediate_results(X, y, subj_id, sample_id, gender, dataset_id, ifm_
         feature_cols = list(range(X.shape[1])) 
 
     df = pd.DataFrame(data=data, columns=feature_cols + ['y', 'subject_id', 'sample_id', 'gender', 'dataset'])
-    if ifm_nifm.startswith('nifm'):
-        import get_nifm_features
-        df = get_nifm_features.aggregate_windows(df)
+    # if ifm_nifm.startswith('nifm'):
+    #     import get_nifm_features
+    #     df = get_nifm_features.aggregate_windows(df)
 
     df.to_csv(os.path.join(store_location[0], f"{store_location[1]}_{ifm_nifm}_{id}.csv"), index=False)
     print(f'Intermediate data saved to {store_location[0]}.')
@@ -36,13 +35,13 @@ def combine_dfs(store_location, ifm_nifm):
     Combine all partial DataFrames to a full DataFrame. 
     """
 
-    partial_dfs = []
+    partial_dfs, file_paths = [], []
     for file in os.listdir(store_location[0]):
-        path_to_file = os.path.join(store_location[0], file)
         if file.startswith(f'{store_location[1]}_{ifm_nifm}_'):
+            path_to_file = os.path.join(store_location[0], file)
+            file_paths.append(path_to_file)
             partial_df = pd.read_csv(path_to_file)
             partial_dfs.append(partial_df)
-            os.remove(path_to_file)
 
     df = pd.concat(partial_dfs)
         
@@ -63,6 +62,11 @@ def combine_dfs(store_location, ifm_nifm):
     #     df = get_nifm_features.aggregate_windows(df)
 
     df.to_csv(os.path.join(store_location[0], f"{store_location[1]}_{ifm_nifm}.csv"), index=False)
+
+    # Remove intermediate files once all features are successfully combined
+    for path_to_file in file_paths:
+        os.remove(path_to_file)
+
     print("Combined dataframe is saved to",os.path.join(store_location[0], f"{store_location[1]}_{ifm_nifm}.csv"))
 
 
@@ -100,6 +104,8 @@ def create_features(dataset, ifm_nifm):
             import get_ifm_features
             features = get_ifm_features.get_spectrograms(path_to_file)
 
+        print(np.shape(features))
+
         X.extend(features)
         y.extend([1 if file[:2] == 'PD' else 0] * features.shape[0])
         subj_id.extend([file[-4:]] * features.shape[0])
@@ -107,8 +113,8 @@ def create_features(dataset, ifm_nifm):
         gender.extend([genderinfo.loc[genderinfo['ID']==int(file[-4:]), 'Sex'].item()] * features.shape[0])
         dataset_id.extend([dataset] * features.shape[0])
         if id % 20 == 0 and id > 0:
-            save_intermediate_results(X, y, subj_id, sample_id, gender, dataset_id,ifm_nifm, store_location, id)
-            X, y, subj_id, sample_id, gender = [], [], [], [], []  # Start with fresh variables
+            save_intermediate_results(X, y, subj_id, sample_id, gender, dataset_id, ifm_nifm, store_location, id)
+            X, y, subj_id, sample_id, gender, dataset_id = [], [], [], [], [], []  # Start with fresh variables
         if id == len(files)-1:
             save_intermediate_results(X, y, subj_id, sample_id, gender, dataset_id, ifm_nifm, store_location, id)
 

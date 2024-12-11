@@ -36,9 +36,12 @@ def get_features(path_to_file):
     x, _ = librosa.core.load(path_to_file, sr=sr)
     input_values = processor(x, return_tensors="pt", sampling_rate=sr).input_values
     with torch.no_grad():
-        hidden_states = model(input_values).last_hidden_state
+        # hidden_states = model(input_values).last_hidden_state
+        hidden_states = model(input_values, output_hidden_states=True).hidden_states[0]
     embedding = hidden_states.detach().numpy()
-    return np.squeeze(embedding)
+    aggregated_emb = agg_windows(np.squeeze(embedding))
+    print(embedding.shape, aggregated_emb.shape)
+    return aggregated_emb.reshape(1, -1)
 
 
 def reduce_dims(df, n_features, n_components=150):
@@ -82,3 +85,13 @@ def aggregate_windows(df):
     aggregated_df = pd.concat([aggregated_df, metadata_df], ignore_index=True, axis=1)
     aggregated_df.columns = list(aggregated_df.columns[:-4]) + list(metadata_df.columns)
     return aggregated_df
+
+def agg_windows(windows):
+    """ Transforms a Nx1024 np array to a 4096-D vector with functionals for each node."""
+    def mean(x): return np.mean(x, axis=0)
+    def std(x): return np.std(x, axis=0)
+    def skew(x): return ss.skew(x, axis=0)
+    def kurt(x): return ss.kurtosis(x, axis=0)
+    aggregations = [mean, std, skew, kurt]
+    aggregated_windows = np.hstack([func(windows) for func in aggregations]).flatten()
+    return aggregated_windows
