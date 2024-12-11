@@ -21,13 +21,14 @@ dataset1 = 'ItalianPD'  # NeuroVoz ItalianPD PCGITA CzechPD
 dataset2 = 'NeuroVoz'
 dataset3 = 'CzechPD'
 dataset4 = 'PCGITA'
-datasets = [dataset1, dataset2, dataset3,dataset4]
+datasets = [dataset1, dataset2, dataset4]
 
-speech_task = 'a'  
+speech_task = 'tdu'  
 
-ifm_or_nifm = 'ifm'
+ifm_or_nifm = 'vgg'
 
 cpals = ['viridis',  'cubehelix', 'magma', 'Spectral']  # 'coolwarm',
+cpals = ['coolwarm'] * 4  # This shows difference between PD and HC across datasets
 
 dfs, setnames = [], []
 for dataset in datasets:
