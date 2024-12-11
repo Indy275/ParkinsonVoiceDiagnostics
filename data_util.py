@@ -2,6 +2,7 @@ import random
 import pandas as pd
 import os
 import configparser
+import numpy as np
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 if os.getenv("COLAB_RELEASE_TAG"):  # colab
@@ -58,5 +59,8 @@ def get_samples(seed, pos_subjs, neg_subjs, n_shots, df):
 
     train_df = df[df['subject_id'].isin(pos_train_samples + neg_train_samples)]
     test_df = df[~df['subject_id'].isin(pos_train_samples + neg_train_samples)]
+
+    # print("train subjects:", list(np.unique(train_df['subject_id'])))
+    # print("test subjects:", list(np.unique(test_df['subject_id'])))
 
     return train_df, test_df
