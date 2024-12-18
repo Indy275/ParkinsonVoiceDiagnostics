@@ -2,9 +2,12 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, TensorDataset
-from transformers import AutoProcessor, HubertModel
+# from transformers import AutoProcessor, HubertModel
 import librosa
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+
 import os.path
 import numpy as np
 import pandas as pd
@@ -13,42 +16,94 @@ import configparser
 from eval import evaluate_predictions
 from file_util import load_files, get_dirs
 from data_util import get_samples
+import soundfile as sf
+import tempfile
 
 config = configparser.ConfigParser()
 config.read('settings.ini')
 
 recreate_features = config.getboolean('RUN_SETTINGS', 'recreate_features')
-
-def PTM():
-    model = HubertModel.from_pretrained("facebook/hubert-large-ls960-ft")
-
-    hidden_size1 = 1024
-    hidden_size2 = 512
-    dropout_prob=0.25
-    model.classifier = nn.Sequential(
-        nn.Linear(model.config.hidden_size, hidden_size1),
-        nn.ReLU(),
-        nn.Dropout(dropout_prob),
-        nn.Linear(hidden_size1, hidden_size2),
-        nn.ReLU(),
-        nn.Dropout(dropout_prob),
-        nn.Linear(hidden_size2, 2)
-    )
-    return model
+print_intermediate = config.getboolean('OUTPUT_SETTINGS', 'print_intermediate')
+k_folds = config.getint('EXPERIMENT_SETTINGS', 'kfolds')
 
 
-def create_PTM():
-    model = PTM()
-    for param in model.parameters():
-        param.requires_grad = False
-    for param in model.encoder.layers[-2:].parameters():  # Unfreeze last layers
-        param.requires_grad = True
+class DNNModel(nn.Module):
+    def __init__(self, input_size, dropout_prob=0.25):
+        super(DNNModel, self).__init__()
 
-    optimizer = optim.AdamW(model.parameters(), lr=0.0005)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.8)
+        hidden_size1 = 1024
+        hidden_size2 = 1024
+        hidden_size3 = 512
+        hidden_size4 = 256
+
+        self.fc1 = nn.Linear(input_size, hidden_size1)
+        self.dropout1 = nn.Dropout(dropout_prob)
+
+        self.fc2 = nn.Linear(hidden_size1, hidden_size2)
+        self.dropout2 = nn.Dropout(dropout_prob)
+
+        self.fc3 = nn.Linear(hidden_size2, hidden_size3)
+        self.dropout3 = nn.Dropout(dropout_prob)
+
+        self.fc4 = nn.Linear(hidden_size3, hidden_size4)
+        self.dropout4 = nn.Dropout(dropout_prob)
+
+        self.fc5 = nn.Linear(hidden_size4, 2)
+        
+    def forward(self, x):
+        x = self.fc1(x)
+        x = torch.relu(x)
+        x = self.dropout1(x)
+
+        x = self.fc2(x)
+        x = torch.relu(x)
+        x = self.dropout2(x)
+
+        x = self.fc3(x)
+        x = torch.relu(x)
+        x = self.dropout3(x)
+
+        x = self.fc4(x)
+        x = torch.relu(x)
+        x = self.dropout4(x)
+
+        x = self.fc5(x)
+        x = torch.sigmoid(x)
+
+        return x
+    
+
+def create_pt_model():
+    model = torch.hub.load('harritaylor/torchvggish', 'vggish')
+    model.classifier = DNNModel(input_size=128)
+    optimizer = optim.AdamW(model.parameters(), lr=0.00005)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.5)
     criterion = nn.CrossEntropyLoss()
-
     return model, optimizer, scheduler, criterion
+
+
+def train_model(model, optimizer, scheduler, criterion, train_loader, num_epochs=5):
+    for epoch in range(num_epochs):
+        model.train()
+        acc = []
+        for batch_data, batch_labels in train_loader:
+            optimizer.zero_grad()  # Reset gradients
+            x = np.squeeze(batch_data)
+            outputs = model(x)  # Get model predictions
+            logits = model.classifier(outputs)
+            # print(logits, batch_labels)
+            _, pred = torch.max(logits.data, 1)
+            
+            loss = criterion(logits, batch_labels.repeat(logits.shape[0]))  # Compute the loss
+            acc.append(accuracy_score(pred.numpy(), batch_labels.repeat(pred.shape[0]).numpy()))
+            # print(outputs, batch_labels, loss)
+            loss.backward()  # Compute gradients
+            optimizer.step()  # Update model weights
+            scheduler.step()
+
+        if print_intermediate: # and epoch % (num_epochs-1) == 0:
+            print(f'Epoch [{epoch+1}/{num_epochs}]: loss: {loss.item():.4f}, lr:', round(optimizer.param_groups[0]['lr'],5),
+                  ', train acc:', round(np.mean(acc), 3))
 
 
 def load_data(dataset):
@@ -58,9 +113,25 @@ def load_data(dataset):
     genderinfo = pd.read_csv(os.path.join(parent_dir, 'gender.csv'), header=0)
     return fdir, store_location, files, genderinfo, HC_id_list, PD_id_list
 
-def get_features(fdir, store_location, files, genderinfo, audio_length=150000, sr=16000):
-    processor = AutoProcessor.from_pretrained("facebook/hubert-large-ls960-ft")
 
+def get_features_vggish(audio_path):
+    global model
+    def preprocess_audio(audio_path):
+        with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav_file:
+                wav_path = temp_wav_file.name  # Get the temporary file path
+                y, sr = sf.read(audio_path)  # Read MP3 using soundfile
+                min_audio_length = sr * 2  # at least 2 seconds of audio
+                if len(y) < min_audio_length:
+                    y = np.pad(y, int(np.ceil((min_audio_length - len(y))/2)))
+                sf.write(wav_path, y, sr, format='wav')  # Write to temporary WAV file
+        return wav_path
+
+    wav_path = preprocess_audio(audio_path)
+    embeddings = model.forward(wav_path)
+    return embeddings.detach().numpy()[:10, :]
+
+
+def get_features(fdir, store_location, files, genderinfo, audio_length=150000, sr=16000):
     X, y, subj_id, sample_id, gender = [], [], [], [], []
     for id, file in enumerate(files):
         if id % 10 == 0:
@@ -70,7 +141,7 @@ def get_features(fdir, store_location, files, genderinfo, audio_length=150000, s
         if len(x) < audio_length:
             x = np.pad(x, int(np.ceil((audio_length - len(x))/2)))
         x = x[:audio_length]
-        features = processor(x, return_tensors="pt", sampling_rate=sr).input_values
+        features = get_features_vggish(path_to_file)
         X.extend(features)
         y.extend([1 if file[:2] == 'PD' else 0] * features.shape[0])
         subj_id.extend([file[-4:]] * features.shape[0])
@@ -85,8 +156,8 @@ def get_features(fdir, store_location, files, genderinfo, audio_length=150000, s
     n_features = X.shape[1]
     
     data = np.hstack((X, y, subj_id, sample_id, gender))
-    base_df = pd.DataFrame(data=data, columns=list(range(X.shape[1])) + ['y', 'subject_id', 'sample_id', 'gender'])
-    base_df.to_csv(os.path.join(store_location[0], f"{store_location[1]}_HuBERT.csv"), index=False)
+    base_df = pd.DataFrame(data=data, columns=list(range(X.shape[1])) + ['y', 'subject_id', 'sample_id', 'gender', 'dataset'])
+    base_df.to_csv(os.path.join(store_location[0], f"{store_location[1]}_vgg.csv"), index=False)
     
     return base_df, n_features
 
@@ -122,8 +193,10 @@ def train_ptm(model, optimizer, scheduler, criterion, train_loader, test_df, x_t
         for batch_data, batch_labels in train_loader:
             optimizer.zero_grad()  # Reset gradients
             outputs = model(batch_data)
+            print(batch_data.shape, outputs.shape, batch_labels)
             hidden_states = outputs.last_hidden_state
             logits = model.classifier(hidden_states.mean(dim=1)) 
+            print(hidden_states.shape, logits.shape)
             loss = criterion(logits, batch_labels) 
             # print(logits, batch_labels, loss)
             loss.backward()
@@ -163,27 +236,45 @@ def train_ptm(model, optimizer, scheduler, criterion, train_loader, test_df, x_t
         # fmetrics_df.to_csv(os.path.join('experiments', f'PTM_{dataset}.csv'), index=False)
 
 def run_ptm(dataset):
-    sr = 16000
-    audio_length = 60000
-
     fdir, store_location, files, genderinfo, HC_id_list, PD_id_list = load_data(dataset)
     
-    if recreate_features:
-        base_df, n_features = get_features(fdir,  store_location, files, genderinfo, audio_length, sr)
-    else:
-        base_df = pd.read_csv(os.path.join(store_location[0], f"{store_location[1]}_HuBERT.csv"))
-        n_features = len(base_df.columns) - 4
+    X, labels = [], []
+    for i, file in enumerate(files):
+        y, sr = sf.read(os.path.join(fdir, file) + '.wav', dtype='int16')  # Read MP3 using soundfile
+        y = y / 32768.0  # Convert to [-1.0, +1.0]
+        
+        audio_length = sr * 5  # 5 seconds of audio
+        if len(y) < audio_length:
+            y = np.pad(y, int(np.ceil((audio_length - len(y))/2)))
+        y = y[:audio_length]
+        X.append(y)
+        labels.extend([1 if file[:2] == 'PD' else 0])
+    X = torch.tensor(np.array(X)).to(torch.float32)
+    labels = torch.tensor(labels)
 
-    base_X_train, base_X_test, base_y_train, base_y_test, test = split_train_test(base_df, HC_id_list, PD_id_list, n_features)
-    
-    train_dataset = TensorDataset(base_X_train, base_y_train)
-    train_loader = DataLoader(train_dataset, shuffle=True) 
-
+    X_train, X_test, y_train, y_test = train_test_split(X, labels, test_size=0.25, random_state=42)
+    train_loader = DataLoader(TensorDataset(X_train,y_train), shuffle=True)
+    test_loader = DataLoader(TensorDataset(X_test,y_test), shuffle=True)
+    print(X.shape, labels.shape)
     print("Data generated; now training the model")
-    
-    model, optimizer, scheduler, criterion = create_PTM()
-    
+    model, optimizer, scheduler, criterion = create_pt_model()
+    train_model(model, optimizer, scheduler, criterion, train_loader, num_epochs=2)
 
-    train_ptm(model, optimizer, scheduler, criterion, train_loader, test, base_X_test, base_y_test)
+    print("Model trained; now evaluating")
+    model.eval()
+    test_acc, test_loss = [], []
+    for batch_data, batch_labels in test_loader:
+        x = np.squeeze(batch_data.numpy())
+        outputs = model(x)  # Get model predictions
+        logits = model.classifier(outputs)
+        _, pred = torch.max(logits.data, 1)
+        
+        test_loss.append(criterion(logits, batch_labels.repeat(logits.shape[0])).detach().numpy()) # Compute the loss
+        test_acc.append(accuracy_score(pred.numpy(), batch_labels.repeat(pred.shape[0]).numpy()))
+    print("test acc:", np.mean(test_acc))
+    print("test loss:", np.mean(test_loss))
+
+
+
     
     

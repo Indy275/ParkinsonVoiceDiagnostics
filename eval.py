@@ -1,4 +1,4 @@
-from sklearn.metrics import roc_auc_score, confusion_matrix, accuracy_score, recall_score
+from sklearn.metrics import roc_auc_score, confusion_matrix, accuracy_score, recall_score, f1_score
 
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -20,6 +20,7 @@ def get_scores(clf_name, y_test, preds):
                       accuracy_score(y_test, preds),
                       roc_auc_score(y_test, preds),
                       recall_score(y_test, preds, pos_label=1),
+                    #   f1_score(y_test, preds),
                       recall_score(y_test, preds, pos_label=0)))
 
         print(confusion_matrix(y_test, preds))

@@ -22,6 +22,9 @@ plot_results = config.getboolean('OUTPUT_SETTINGS', 'plot_results')
 base_dataset += '_' + base_speech_task
 target_dataset += '_' + target_speech_task
 
+# import run_experiments
+# run_experiments.run_experiments()
+
 if recreate_features:
     import get_features
     print(f"Creating {ifm_or_nifm} features for '{base_dataset}' dataset ")
@@ -29,22 +32,24 @@ if recreate_features:
 
     if not target_dataset.startswith('pass') and run_crosslingual:
         print(f"Creating {ifm_or_nifm} features for '{target_dataset}' dataset ")
-        get_features.create_features(target_dataset, ifm_or_nifm)
+        get_features.create_features(target_dataset, ifm_or_nifm)    
 
 if run_monolingual:
     import run_experiments
     print(f"Started execution of the {clf}-{ifm_or_nifm} model with {base_dataset} data ")
-    run_experiments.run_monolingual(base_dataset, ifm_or_nifm, model=clf, k=kfolds)
+    run_experiments.run_monolingual(base_dataset, ifm_or_nifm, modeltype=clf, k=kfolds)
 
 if run_crosslingual:
     import run_experiments
     print(f"Started execution of the {clf}-{ifm_or_nifm} model with {base_dataset}-base and {target_dataset}-target data ")
-    run_experiments.run_crosslingual(base_dataset, target_dataset, ifm_or_nifm, model=clf, k=kfolds)
+    run_experiments.run_crosslingual(base_dataset, target_dataset, ifm_or_nifm, modeltype=clf, k=kfolds)
 
 if plot_results:
     if clf.endswith('FSTL'):
-        from plotting import results_visualised
+        from plotting import results_visualised, crosslingual_fstl_comp
         results_visualised.plot_TL_performance(base_dataset, target_dataset)
+        crosslingual_fstl_comp.plot_TL_performance(base_dataset, target_dataset, clf)
+        
     if run_monolingual:
         #todo: monolingual plotting
         pass
@@ -52,6 +57,3 @@ if plot_results:
 if run_pretrained:
     import pretrained_model
     pretrained_model.run_ptm(base_dataset)
-
-# from plotting import results_visualised
-# results_visualised.plot_TL_performance(base_dataset, target_dataset)
