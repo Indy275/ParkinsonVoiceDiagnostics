@@ -11,6 +11,7 @@ from transformers import AutoProcessor, HubertModel
 model = torch.hub.load('harritaylor/torchvggish', 'vggish')
 model.eval()
 
+
 def get_features_vggish(audio_path):
     global model
     def preprocess_audio(audio_path):
