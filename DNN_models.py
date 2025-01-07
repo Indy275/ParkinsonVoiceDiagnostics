@@ -33,7 +33,7 @@ class BaseModel:
         self.model.load_state_dict(self.model.state_dict())
         return self.model
 
-    def train(self, train_loader, num_epochs=5):
+    def train(self, train_loader, num_epochs=10):
         for epoch in range(num_epochs):
             self.model.train()
             train_acc = []
@@ -116,7 +116,7 @@ class CNNModel(nn.Module):
         self.pool4 = nn.MaxPool2d(kernel_size=2, stride=2)
         
         # Fully connected layers with dropout
-        self.fc1 = nn.Linear(in_features=1792, out_features=256) 
+        self.fc1 = nn.Linear(in_features=11904, out_features=256) 
         self.dropout5 = nn.Dropout(p=0.25)
         
         self.fc2 = nn.Linear(in_features=256, out_features=128)
@@ -162,10 +162,10 @@ class CNN_model(BaseModel):
         self.name = 'CNN'
         self.mono = mono
     
-    def create_model(self, **kwargs):
+    def create_model(self, n_features, **kwargs):
         self.model = CNNModel()
-        self.optimizer = optim.AdamW(self.model.parameters(), lr=0.0005)
-        self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=100, gamma=0.5)
+        self.optimizer = optim.AdamW(self.model.parameters(), lr=0.0001)
+        self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=500, gamma=0.75)
         self.criterion = nn.CrossEntropyLoss()
 
 
@@ -234,7 +234,7 @@ class PT_model(BaseModel):
         self.name = 'PTM'
         self.mono = mono
 
-    def create_model(self, **kwargs):
+    def create_model(self, n_features, **kwargs):
         self.model = torch.hub.load('harritaylor/torchvggish', 'vggish')
         self.model.classifier = DNNModel(input_size=128)
         self.optimizer = optim.AdamW(self.model.parameters(), lr=0.00005)
@@ -247,11 +247,11 @@ class PT_model(BaseModel):
             train_acc = []
             for batch_data, batch_labels in train_loader:
                 self.optimizer.zero_grad()  # Reset gradients
-                # batch_data = np.squeeze(batch_data.numpy())  # <- PTM
+                batch_data = np.squeeze(batch_data.numpy())  # <- PTM
 
                 outputs = self.model(batch_data)  # Get model predictions
-                # outputs = self.model.classifier(outputs)  # <- PTM
-                # batch_labels = batch_labels.repeat(outputs.shape[0])  # <- PTM
+                outputs = self.model.classifier(outputs)  # <- PTM
+                batch_labels = batch_labels.repeat(outputs.shape[0])  # <- PTM
 
                 _, prediction = torch.max(outputs.data, 1)
                 loss = self.criterion(outputs, batch_labels)  # Compute the loss
@@ -268,21 +268,24 @@ class PT_model(BaseModel):
 class ResNet_model(BaseModel):
     def __init__(self, mono):
         super().__init__()
-        self.name = 'CNN'
+        self.name = 'ResNet'
         self.mono = mono
 
-    def create_model(self, **kwargs):
+    def create_model(self, n_features, **kwargs):
         self.model = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+        # for params in self.model.parameters():
+        #     params.requires_grad = True
         for params in self.model.parameters():
-            params.requires_grad = True
-        # for params in model.parameters():
-        #         params.requires_grad = False
-        # for param in model.layer4.parameters():
-        #     param.requires_grad = True
-        # for param in model.fc.parameters():
-        #     param.requires_grad = True
+                params.requires_grad = False
+
+        for param in self.model.layer3.parameters():
+            param.requires_grad = True
+        for param in self.model.layer4.parameters():
+            param.requires_grad = True
+        for param in self.model.fc.parameters():
+            param.requires_grad = True
 
         self.model.fc = nn.Linear(self.model.fc.in_features, 2)
-        self.optimizer = optim.AdamW(self.model.parameters(), lr=0.001)
+        self.optimizer = optim.AdamW(self.model.parameters(), lr=0.00001)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=500, gamma=0.6)
         self.criterion = nn.CrossEntropyLoss()

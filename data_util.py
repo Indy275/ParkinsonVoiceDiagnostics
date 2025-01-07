@@ -16,6 +16,7 @@ config = configparser.ConfigParser()
 config.read('settings.ini')
 normalize_audio = config.getboolean('DATA_SETTINGS', 'normalize_audio')
 
+
 def make_train_test_split(id_list, test_size=0.3, seed=1):
     """
     Divide a list into a training set and a testing set according to a given test set percentage
@@ -36,7 +37,6 @@ def load_data(dataset, ifm_nifm):
 
 def scale_features(df, n_features, train_indices, test_indices):
     scaler = StandardScaler()
-    # scaler = MinMaxScaler((0, 1))
 
     X_train = df.loc[train_indices, df.columns[:n_features]]
     X_test = df.loc[test_indices, df.columns[:n_features]]

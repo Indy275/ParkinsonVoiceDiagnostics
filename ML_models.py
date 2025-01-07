@@ -47,7 +47,6 @@ class SVM_model:
         return preds
 
     def eval_multilingual(self, base_X_test, tgt_X_test):
-        print(base_X_test.shape, tgt_X_test.shape)
         base_preds = self.model.predict(base_X_test)
         tgt_preds = self.model.predict(tgt_X_test)
         return base_preds, tgt_preds

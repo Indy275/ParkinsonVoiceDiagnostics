@@ -113,7 +113,7 @@ def create_features(dataset, ifm_nifm):
         sample_id.extend([id] * features.shape[0])
         gender.extend([genderinfo.loc[genderinfo['ID']==int(file[-4:]), 'Sex'].item()] * features.shape[0])
         dataset_id.extend([dataset] * features.shape[0])
-        if id % 50 == 0 and id > 0:
+        if id % 20 == 0 and id > 0:
             save_intermediate_results(X, y, subj_id, sample_id, gender, dataset_id, ifm_nifm, store_location, id)
             X, y, subj_id, sample_id, gender, dataset_id = [], [], [], [], [], []  # Start with fresh variables
         if id == len(files)-1:
