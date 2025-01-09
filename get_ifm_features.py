@@ -112,11 +112,8 @@ def get_mfcc(x):
     return mfcc
 
 
-def get_features(path_to_file):
-    sr = 16000
-    x, _ = librosa.core.load(path_to_file, sr=sr)
-    sound = parselmouth.Sound(path_to_file)
-    sound = sound.resample(sr)
+def get_features(x):
+    sound = parselmouth.Sound(x, sampling_frequency=sr)
     f0_feats = get_f0(sound)
     formants = measureFormants(sound, fmin, fmax)
     jitter_shimmer = measurePitch(sound, fmin, fmax)
@@ -128,14 +125,7 @@ def get_features(path_to_file):
     return ifm_feats
 
 
-def get_spectrograms(file_path):
-    sr = 16000
-    start_time = sr * 1
-    audio_length = sr * 8 # 5 seconds of audio
-    y, sr = librosa.load(file_path, sr=sr)  
-    if len(y) < audio_length+start_time:
-            y = np.pad(y, int(np.ceil((start_time+audio_length - len(y))/2)))
-    y = y[start_time:start_time+audio_length]
+def get_spectrograms(y):
     mels = librosa.feature.melspectrogram(y=y, sr=sr, n_fft=512, hop_length=64, n_mels=65)
     mels_db = librosa.power_to_db(mels, ref=np.max)
     mels_db = (mels_db - mels_db.mean()) / mels_db.std()

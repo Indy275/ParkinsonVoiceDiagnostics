@@ -69,6 +69,12 @@ def combine_dfs(store_location, ifm_nifm):
     print("Combined dataframe is saved to",os.path.join(store_location[0], f"{store_location[1]}_{ifm_nifm}.csv"))
 
 
+def split_audio(x, sr, chunk_duration=4):
+    chunk_length = int(sr * chunk_duration)
+    if len(x) <= chunk_length:
+        return [x]
+    return [x[i:i + chunk_length] for i in range(0, len(x), chunk_length)]
+
 def create_features(dataset, ifm_nifm):
     dir, store_location = get_dirs(dataset)
 
@@ -86,33 +92,33 @@ def create_features(dataset, ifm_nifm):
         path_to_file = os.path.join(dir, file) + '.wav'
 
         x, sr = librosa.core.load(path_to_file, sr=16000)
-        if len(x) < 24000:  # at least 1.5 seconds of audio
-            print("Recording too short, skipping file",file)
-            continue
-        
-        if ifm_nifm.startswith('ifm'):
-            import get_ifm_features
-            features = get_ifm_features.get_features(path_to_file)
-        elif ifm_nifm.startswith('nifm'):
-            import get_nifm_features
-            features = get_nifm_features.get_features(path_to_file)
-        elif ifm_nifm.startswith('vgg'):
-            import get_nifm_features
-            features = get_nifm_features.get_features_vggish(path_to_file)
-        elif ifm_nifm.startswith('spec'):
-            import get_ifm_features
-            features = get_ifm_features.get_spectrograms(path_to_file)
-        elif ifm_nifm.startswith('wave'):
-            x = x / 32768.0  # Convert to [-1.0, +1.0]
-            audio_length = sr * 3  # 5 seconds of audio
-            features = np.pad(x, max(0, int(np.ceil(audio_length - len(x))/2)))[:audio_length].reshape(1,-1)
+        chunks = split_audio(x, sr)
+        for chunk in chunks:
+            if len(chunk) < 24000:  # at least 1.5 seconds of audio
+                continue
+            
+            if ifm_nifm.startswith('ifm'):
+                import get_ifm_features
+                features = get_ifm_features.get_features(chunk)
+            elif ifm_nifm.startswith('nifm'):
+                import get_nifm_features
+                features = get_nifm_features.get_features(chunk)
+            elif ifm_nifm.startswith('vgg'):
+                import get_nifm_features
+                features = get_nifm_features.get_features_vggish(chunk)
+            elif ifm_nifm.startswith('spec'):
+                import get_ifm_features
+                features = get_ifm_features.get_spectrograms(chunk)
+            elif ifm_nifm.startswith('wave'):
+                features = x / 32768.0  # Convert to [-1.0, +1.0]
+                features = features.reshape(1, -1)
 
-        X.extend(features)
-        y.extend([1 if file[:2] == 'PD' else 0] * features.shape[0])
-        subj_id.extend([file[-4:]] * features.shape[0])
-        sample_id.extend([id] * features.shape[0])
-        gender.extend([genderinfo.loc[genderinfo['ID']==int(file[-4:]), 'Sex'].item()] * features.shape[0])
-        dataset_id.extend([dataset] * features.shape[0])
+            X.extend(features)
+            y.extend([1 if file[:2] == 'PD' else 0] * features.shape[0])
+            subj_id.extend([file[-4:]] * features.shape[0])
+            sample_id.extend([id] * features.shape[0])
+            gender.extend([genderinfo.loc[genderinfo['ID']==int(file[-4:]), 'Sex'].item()] * features.shape[0])
+            dataset_id.extend([dataset] * features.shape[0])
         if id % 20 == 0 and id > 0:
             save_intermediate_results(X, y, subj_id, sample_id, gender, dataset_id, ifm_nifm, store_location, id)
             X, y, subj_id, sample_id, gender, dataset_id = [], [], [], [], [], []  # Start with fresh variables

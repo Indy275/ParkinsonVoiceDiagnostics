@@ -1,4 +1,4 @@
-import librosa
+import configparser
 import torch
 import numpy as np
 import pandas as pd
@@ -6,35 +6,37 @@ import scipy.stats as ss
 from sklearn.decomposition import PCA
 import soundfile as sf
 import tempfile
-from transformers import AutoProcessor, HubertModel
-
-model = torch.hub.load('harritaylor/torchvggish', 'vggish')
-model.eval()
 
 
-def get_features_vggish(audio_path):
+config = configparser.ConfigParser()
+config.read('settings.ini')
+ifm_or_nifm = config['EXPERIMENT_SETTINGS']['ifm_or_nifm']
+if ifm_or_nifm == 'nifm':
+    from transformers import AutoProcessor, HubertModel
+elif ifm_or_nifm == 'vgg':
+    model = torch.hub.load('harritaylor/torchvggish', 'vggish')
+    model.eval()
+
+sr = 16000  # Sampling rate
+
+def get_features_vggish(y):
     global model
-    def preprocess_audio(audio_path):
+    def preprocess_audio(y):
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as temp_wav_file:
                 wav_path = temp_wav_file.name  # Get the temporary file path
-                y, sr = sf.read(audio_path)  # Read MP3 using soundfile
-                min_audio_length = sr * 2  # at least 2 seconds of audio
-                if len(y) < min_audio_length:
-                    y = np.pad(y, int(np.ceil((min_audio_length - len(y))/2)))
                 sf.write(wav_path, y, sr, format='wav')  # Write to temporary WAV file
         return wav_path
+    wav_path = preprocess_audio(y)
+    embeddings = model.forward(wav_path).detach().numpy()
+    if len(embeddings.shape) == 1:
+        embeddings = embeddings.reshape(1, -1)
+    return embeddings[:10, :]
 
-    wav_path = preprocess_audio(audio_path)
-    embeddings = model.forward(wav_path)
-    return embeddings.detach().numpy()[:10, :]
 
-
-def get_features(path_to_file):
+def get_features(x):
     processor = AutoProcessor.from_pretrained("facebook/hubert-large-ls960-ft")
     model = HubertModel.from_pretrained("facebook/hubert-large-ls960-ft")
     
-    sr = 16000
-    x, _ = librosa.core.load(path_to_file, sr=sr)
     input_values = processor(x, return_tensors="pt", sampling_rate=sr).input_values
     with torch.no_grad():
         # hidden_states = model(input_values).last_hidden_state
