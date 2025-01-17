@@ -11,7 +11,7 @@ import tempfile
 config = configparser.ConfigParser()
 config.read('settings.ini')
 ifm_or_nifm = config['EXPERIMENT_SETTINGS']['ifm_or_nifm']
-if ifm_or_nifm == 'nifm':
+if ifm_or_nifm.startswith('hubert'):
     from transformers import AutoProcessor, HubertModel
 elif ifm_or_nifm == 'vgg':
     model = torch.hub.load('harritaylor/torchvggish', 'vggish')
@@ -33,17 +33,19 @@ def get_features_vggish(y):
     return embeddings[:10, :]
 
 
-def get_features(x):
+
+def get_features_hubert(x, layer):
     processor = AutoProcessor.from_pretrained("facebook/hubert-large-ls960-ft")
     model = HubertModel.from_pretrained("facebook/hubert-large-ls960-ft")
     
     input_values = processor(x, return_tensors="pt", sampling_rate=sr).input_values
     with torch.no_grad():
-        # hidden_states = model(input_values).last_hidden_state
-        hidden_states = model(input_values, output_hidden_states=True).hidden_states[0]
+        if layer == '1':
+            hidden_states = model(input_values).last_hidden_state
+        if layer == '0':
+            hidden_states = model(input_values, output_hidden_states=True).hidden_states[0]
     embedding = hidden_states.detach().numpy()
     aggregated_emb = agg_windows(np.squeeze(embedding))
-    print(embedding.shape, aggregated_emb.shape)
     return aggregated_emb.reshape(1, -1)
 
 

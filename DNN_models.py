@@ -33,7 +33,7 @@ class BaseModel:
         self.model.load_state_dict(self.model.state_dict())
         return self.model
 
-    def train(self, train_loader, num_epochs=10):
+    def train(self, train_loader, num_epochs=5):
         for epoch in range(num_epochs):
             self.model.train()
             train_acc = []
@@ -43,7 +43,7 @@ class BaseModel:
                 outputs = self.model(batch_data)  # Get model predictions
                 _, prediction = torch.max(outputs.data, 1)
                 loss = self.criterion(outputs, batch_labels)  # Compute the loss
-                train_acc.append(accuracy_score(prediction.numpy(), batch_labels))
+                train_acc.append(accuracy_score(prediction.numpy(), np.array(batch_labels)))
                 loss.backward()  # Compute gradients
                 self.optimizer.step()  # Update model weights
                 self.scheduler.step()
@@ -71,7 +71,7 @@ class BaseModel:
             y = torch.tensor(df.loc[:, 'y'].values)
         
         tensor_dataset = TensorDataset(X,y)
-        data_loader = DataLoader(tensor_dataset, shuffle=True)
+        data_loader = DataLoader(tensor_dataset, batch_size=64, shuffle=True)
         if train:
             return df, data_loader, n_features
         return df, X, y
@@ -223,7 +223,7 @@ class DNN_model(BaseModel):
 
     def create_model(self, n_features, **kwargs):
         self.model = DNNModel(input_size=n_features)
-        self.optimizer = optim.AdamW(self.model.parameters(), lr=0.001)
+        self.optimizer = optim.AdamW(self.model.parameters(), lr=0.0001)
         self.scheduler = optim.lr_scheduler.StepLR(self.optimizer, step_size=100, gamma=0.5)
         self.criterion = nn.CrossEntropyLoss()
 
@@ -255,7 +255,7 @@ class PT_model(BaseModel):
 
                 _, prediction = torch.max(outputs.data, 1)
                 loss = self.criterion(outputs, batch_labels)  # Compute the loss
-                train_acc.append(accuracy_score(prediction.numpy(), batch_labels))
+                train_acc.append(accuracy_score(prediction.numpy(), np.array(batch_labels)))
                 loss.backward()  # Compute gradients
                 self.optimizer.step()  # Update model weights
                 self.scheduler.step()

@@ -75,6 +75,9 @@ def measureFormants(sound, f0min, f0max):
     f1_list = []
     f2_list = []
     f3_list = []
+    f1bw_list = []
+    f2bw_list = []
+    f3bw_list = []
     # Measure formants only at glottal pulses
     for point in range(0, numPoints):
         point += 1
@@ -86,11 +89,22 @@ def measureFormants(sound, f0min, f0max):
         f2_list.append(f2)
         f3_list.append(f3)
 
+        f1bw = call(formants, "Get bandwidth at time", 1, t, 'Hertz', 'Linear')
+        f2bw = call(formants, "Get bandwidth at time", 2, t, 'Hertz', 'Linear')
+        f3bw = call(formants, "Get bandwidth at time", 3, t, 'Hertz', 'Linear')
+        f1bw_list.append(f1bw)
+        f2bw_list.append(f2bw)
+        f3bw_list.append(f3bw)
+
     f1_mean = np.array([f1 for f1 in f1_list if str(f1) != 'nan']).mean()
     f2_mean = np.array([f2 for f2 in f2_list if str(f2) != 'nan']).mean()
     f3_mean = np.array([f3 for f3 in f3_list if str(f3) != 'nan']).mean()
 
-    formants_mean = np.hstack((f1_mean, f2_mean, f3_mean)).reshape(1, -1)
+    f1_bw_mean = np.array([f1 for f1 in f1bw_list if str(f1) != 'nan']).mean()
+    f2_bw_mean = np.array([f2 for f2 in f2bw_list if str(f2) != 'nan']).mean()
+    f3_bw_mean = np.array([f3 for f3 in f3bw_list if str(f3) != 'nan']).mean()
+
+    formants_mean = np.hstack((f1_mean, f2_mean, f3_mean, f1_bw_mean, f2_bw_mean, f3_bw_mean)).reshape(1, -1)
     return formants_mean
 
 
@@ -119,7 +133,7 @@ def get_features(x):
     jitter_shimmer = measurePitch(sound, fmin, fmax)
     mfcc_feats = get_mfcc(x)
 
-    # [6, 5, 6, 3, 156]
+    # [6, 5, 6, 6, 156]
     ifm_feats = np.hstack((f0_feats, jitter_shimmer, formants, mfcc_feats))
     ifm_feats = np.nan_to_num(ifm_feats)
     return ifm_feats

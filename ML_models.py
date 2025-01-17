@@ -1,28 +1,16 @@
-import random
 from copy import deepcopy
 import numpy as np
-import pandas as pd
 import configparser
-
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.linear_model import SGDClassifier
-from sklearn.svm import SVC
-from eval import evaluate_predictions
-
-from data_util import get_samples
 
 config = configparser.ConfigParser()
 config.read('settings.ini')
 plot_fimp = config.getboolean('OUTPUT_SETTINGS', 'plot_fimp')
 print_intermediate = config.getboolean('OUTPUT_SETTINGS', 'print_intermediate')
 
-if plot_fimp:
-    from plotting.results_visualised import fimp_plot, fimp_plot_nifm
-
-
-class SVM_model:
+class SGD_model:
     def __init__(self, mono):
-        self.name = 'SVM'
+        self.name = 'SGD'
         self.mono = mono
         self.base_model = None
 

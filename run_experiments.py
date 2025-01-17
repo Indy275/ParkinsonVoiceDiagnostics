@@ -4,6 +4,7 @@ from copy import deepcopy
 import numpy as np
 import pandas as pd
 import configparser
+from tqdm import tqdm
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import StratifiedKFold
@@ -11,7 +12,7 @@ from data_util import load_data, scale_features, get_samples
 from eval import evaluate_predictions
 
 from DNN_models import DNN_model, CNN_model, PT_model, ResNet_model
-from ML_models import SVM_model
+from ML_models import SGD_model
 
 config = configparser.ConfigParser()
 config.read('settings.ini')
@@ -29,11 +30,13 @@ cwd = os.path.abspath(os.getcwd())
 experiment_folder = os.path.join(cwd,'experiments')
 if not os.path.exists(experiment_folder):
     os.makedirs(experiment_folder)
+    df = pd.DataFrame(columns=['dataset','model','ifm_nifm','fMACC','fMAUC','sMACC','sMAUC'])
+    df.to_csv(os.path.join(experiment_folder,'monolingual_result.csv'), index=False)
 
 
 def get_model(modeltype):
     model_dict = {
-        'SVM': SVM_model,
+        'SGD': SGD_model,
         'DNN': DNN_model,
         'CNN': CNN_model,
         'PTM': PT_model,
@@ -45,8 +48,14 @@ def get_model(modeltype):
 
 
 def prepare_data(dataset, ifm_nifm, gender, addition=''):
-    df, n_features = load_data(dataset, ifm_nifm)
+    dfs, n_feat = [], []
+    for ds in dataset.split('_')[:-1]:
+        df, n_features = load_data(f"{ds}_{dataset.split('_')[-1]}", ifm_nifm)
+        n_feat.append(n_features)
+        dfs.append(df)
+    df = pd.concat(dfs)
     df['sample_id'] = df['sample_id'].astype(str) + addition
+    assert len(set(n_feat)) == 1, "Number of features across datasets should be equal: {}".format(n_feat)
 
     # Experiment: train model to separate data sets
     if False:
@@ -75,7 +84,7 @@ def prepare_train_test(base_model, base_df, base_features, k):
     k = min(k, np.min(list(np.unique(base_df_split['ygender'], return_counts=True)[1])))
     
     data_splits = []
-    outer_k = 5
+    outer_k = 3
     for _ in range(outer_k):
         kf = StratifiedKFold(n_splits=k, shuffle=True)
         for train_split_indices, test_split_indices in kf.split(base_df_split['subject_id'], base_df_split['ygender']):
@@ -93,7 +102,7 @@ def prepare_train_test(base_model, base_df, base_features, k):
 
 
 def get_fimp(model, data):
-    if not model.startswith("SVM"):
+    if not model.startswith("SGD"):
         X, y = data.dataset[:]
     else:
         X, y = data
@@ -108,22 +117,23 @@ def run_monolingual(dataset, ifm_nifm, modeltype, k=2):
     
     df, n_features = prepare_data(dataset, ifm_nifm, gender)
     
-    print(f"Data loaded succesfully with shapes {df.shape}, now running {model.name} classifier with {k} folds")
+    if print_intermediate:
+        print(f"Data loaded succesfully with shapes {df.shape}, now running {model.name} classifier with {k} folds")
 
     data_splits = prepare_train_test(model, df, n_features, k)
 
     file_metrics, subject_metrics, fimps = [], [], []
-    for i, split in enumerate(data_splits):
-        print(f"Running {modeltype} with data split [{i+1}/{len(data_splits)}]")
+    for i, split in tqdm(enumerate(data_splits)):
+        # if i % int(len(data_splits)/3) == 0:
+            # print(f"Running {modeltype} with data split [{i+1}/{len(data_splits)}]")
         scaler, model, base_df, base_train_idc, base_test_idc = split
-
         # Create base train and test set based on split indices
         train_df = base_df.loc[base_train_idc, :]
         test_df = base_df.loc[base_test_idc, :]
 
         # Experiment with multi-lingual dataset
-        if True: 
-            dataset = 'ItalianPD'  # only test on specific data
+        if False: 
+            dataset = 'IPVS'  # only test on specific data
             # train_df = train_df[train_df['dataset']!=dataset]
             test_df = test_df[test_df['dataset']==dataset]
 
@@ -158,9 +168,8 @@ def run_monolingual(dataset, ifm_nifm, modeltype, k=2):
         metrics, grouped = zip(*all_metrics)
         file_metrics.append(metrics)
         subject_metrics.append(grouped)
-        
 
-    print(f"Average {k}-fold performance of {model.name}-{ifm_nifm} model with {dataset} data:")
+
     file_scores, subject_scores = [], []
     score_names = ['Mean Acc:', 'Mean AUC:', 'Mean Sens:', 'Mean Spec:']
     for metric in np.mean(file_metrics, axis=0).flatten():
@@ -168,16 +177,19 @@ def run_monolingual(dataset, ifm_nifm, modeltype, k=2):
     for metric in np.mean(subject_metrics, axis=0).flatten():
         subject_scores.append(round(metric, 3))
 
-    if dataset[-3:] != 'tdu' and dataset[-3:] != 'ddk':
-        print("Target data (file-level) performance:")
-        for name, score in zip(score_names, file_scores):
-            print(name, score)
+    if print_intermediate:
+        print(f"Average {k}-fold performance of {model.name}-{ifm_nifm} model with {dataset} data:")
+        if dataset[-3:] != 'tdu' and dataset[-3:] != 'ddk':
+            print("Target data (file-level) performance:")
+            for name, score in zip(score_names, file_scores):
+                print(name, score)
 
-    print("Target data (speaker-level) performance:")
-    for name, score in zip(score_names, subject_scores):
-            print(name, score)
+        print("Target data (speaker-level) performance:")
+        for name, score in zip(score_names, subject_scores):
+                print(name, score)
+    print(f"Mean {k}-fold AUC {model.name}-{ifm_nifm} on {dataset}:", subject_scores[1])
     
-    if k >= 5:   # write results of at least 5-fold crossvalidated results
+    if k >= 5:   # write results only when at least 5-fold crossvalidation is done
         with open('experiments/monolingual_result.csv', 'a') as f:
             result = f'\n{dataset},{model.name},{ifm_nifm},{file_scores[0]},{file_scores[1]},{subject_scores[0]},{subject_scores[1]}'
             f.write(result)
@@ -188,18 +200,8 @@ def run_monolingual(dataset, ifm_nifm, modeltype, k=2):
         fimp_plot(fimp, df)
         # fimp_plot_nifm(fimp, df)
 
+    return subject_scores[1]
 
-def run_experiments():
-    clf = 'DNN'
-    ifm_or_nifm = ['ifm', 'vgg']
-    datasets = ['PCGITA']
-    speech_task = 'tdu'
-    for ds in datasets:
-        ds += '_' + speech_task
-
-        for feat in ifm_or_nifm:
-            print(f"Started execution of the {clf}-{feat} model with {ds} data ")
-            run_monolingual(ds, feat, model=clf, k=5)
 
 
 def run_fewshot(scaler, model, base_train_df, base_test_df, tgt_df, n_features):
@@ -211,9 +213,9 @@ def run_fewshot(scaler, model, base_train_df, base_test_df, tgt_df, n_features):
     neg_subjs = list(tgt_df[tgt_df['y'] == 0]['subject_id'].unique())
     if fewshot:
         min_shot = 0
-        max_shot = min(len(pos_subjs), len(neg_subjs)) -1  
+        max_shot = min(len(pos_subjs), len(neg_subjs)) -1  # 1 less than the number of subjects
     else:  
-        tgt_train_size = int(min(len(pos_subjs), len(neg_subjs))*0.7)
+        tgt_train_size = int(min(len(pos_subjs), len(neg_subjs))*0.7) # 70% of the data
         min_shot = tgt_train_size
         max_shot = tgt_train_size + 1 
     
@@ -227,8 +229,9 @@ def run_fewshot(scaler, model, base_train_df, base_test_df, tgt_df, n_features):
 
         if n_shots > 0:
             # Fine-tune model with pos and neg samples from base and target set
-            n_base_samples = int(max(1, min(n_shots/4, len(base_pos_subjs) -1, len(base_neg_subjs) -1)))
-            base_train_df, base_test_df_copy = get_samples(seed, base_pos_subjs, base_neg_subjs,n_base_samples, base_df)
+            base_mixing_parameter = 0.5
+            n_base_samples = int(max(1, min(base_mixing_parameter*n_shots, len(base_pos_subjs) -1, len(base_neg_subjs) -1)))
+            base_train_df, base_test_df_copy = get_samples(seed, base_pos_subjs, base_neg_subjs, n_base_samples, base_df)
             tgt_train_df, tgt_test_df = get_samples(seed, pos_subjs, neg_subjs, n_shots, tgt_df)
 
             # Add target train data to scaler fit
@@ -236,7 +239,7 @@ def run_fewshot(scaler, model, base_train_df, base_test_df, tgt_df, n_features):
             tgt_train_df.iloc[:, :n_features] = scaler_copy.transform(tgt_train_df.iloc[:, :n_features].values)
 
             # Concatenate train data
-            # tgt_train_df = pd.concat([tgt_train_df, base_train_df], ignore_index=True, axis=0)
+            tgt_train_df = pd.concat([tgt_train_df, base_train_df], ignore_index=True, axis=0)
             
             # Get target train data
             tgt_train_df, train_loader, n_features = model_copy.get_X_y(tgt_train_df, train=True)
@@ -272,13 +275,15 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, modeltype, k=2):
     target_df, tgt_features = prepare_data(target_dataset, ifm_nifm, tgt_gender, addition='tgt')
     assert n_features == tgt_features, "Number of features across languages should be equal: {} and {}".format(
         n_features, tgt_features)
-    print(f"Data loaded succesfully with shapes {base_df.shape}, {target_df.shape}, now running {modeltype} classifier")
+    if print_intermediate:
+        print(f"Data loaded succesfully with shapes {base_df.shape}, {target_df.shape}, now running {modeltype} classifier")
     
     data_splits = prepare_train_test(model, base_df, n_features, k)
 
     file_metrics, subject_metrics, base_metrics = [], [], []
     for i, split in enumerate(data_splits):
-        print(f"Running {modeltype} with data split [{i+1}/{len(data_splits)}]")
+        if i % int(len(data_splits)/3) == 0:
+            print(f"Running {modeltype} with data split [{i+1}/{len(data_splits)}]")
         scaler, model, base_df, base_train_idc, base_test_idc = split
         
         # Create base train and test set based on split indices
@@ -354,3 +359,5 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, modeltype, k=2):
             with open('experiments/crosslingual_result.csv', 'a') as f:
                 result = f'\n{base_dataset}_{target_dataset},{model.name},{ifm_nifm},{file_scores[0]},{file_scores[1]},{subject_scores[0]},{subject_scores[1]}'
                 f.write(result)
+
+

@@ -73,8 +73,8 @@ def rename_neurovoz_files():
 ############################### PC-GITA ###############################
 
 def rename_pcgita_files():
-    dir = data_dir + "PCGITA\\records_a\\"
-    modified_dir = data_dir + "PCGITA\\records_aa\\"
+    dir = data_dir + "PCGITA\\records_rp_norm\\"
+    modified_dir = data_dir + "PCGITA\\records_readtxt_norm\\"
     subj_files = defaultdict(list)
 
     for subdir, dirs, files in os.walk(dir):
@@ -89,7 +89,7 @@ def rename_pcgita_files():
     # To copy every recording separately
     for subj_id, files in subj_files.items():
         for i, audio_file in enumerate(files):
-            output_fname = os.path.join(modified_dir, f"{subj_id[:2]}_A{i+1}_{subj_id[-4:]}.wav")
+            output_fname = os.path.join(modified_dir, f"{subj_id[:2]}_RP{i+1}_{subj_id[-4:]}.wav")
             shutil.copy(audio_file, output_fname)
         
     # To concatenate audio recordings, use:
@@ -102,6 +102,9 @@ def rename_pcgita_files():
     #         else: concat_audio += audio
     #     output_fname = os.path.join(modified_dir, f"{subj_id[:2]}_DDK_{subj_id[-4:]}.wav")
     #     concat_audio.export(output_fname, format='wav')
+
+rename_pcgita_files()
+
 
 def pcgita_gender():
     store_location = os.path.join(data_dir, 'PCGITA')
@@ -168,7 +171,7 @@ def get_files_per_task():
     new_id_count = 0
 
     for i, folder in enumerate(data_folders):
-        dir = data_dir + "ItalianPD\\{}\\".format(folder)
+        dir = data_dir + "IPVS\\{}\\".format(folder)
         for subdir, dirs, files in os.walk(dir):
             
             id = subdir.split('\\')[-1]
@@ -206,7 +209,7 @@ def concat_files(subj_files, new_name, new_dir):
         concat_audio.export(output_fname+'.wav', format='wav')
 
 def rename_italian_files():
-    modified_dir = data_dir + "ItalianPD\\records"
+    modified_dir = data_dir + "IPVS\\records"
     new_dirs = [modified_dir+"\\", modified_dir+"_ddk\\", modified_dir+"_tdu\\"]
     subj_files_a, subj_files_ddk, subj_files_tdu, genderinfo = get_files_per_task()
     for files, name, dir in zip([subj_files_a, subj_files_ddk, subj_files_tdu], ['A1', 'DDK', 'TDU'], new_dirs):
@@ -216,7 +219,7 @@ def rename_italian_files():
     df.columns = ['ID', 'Sex']
     df = df.explode('Sex')
     df['ID'] = df['ID'].str[2:]
-    df.to_csv(data_dir + 'ItalianPD\\gender.csv', index=False)
+    df.to_csv(data_dir + 'IPVS\\gender.csv', index=False)
 
  ########################### Turkish #########################################
 
@@ -264,7 +267,7 @@ def downsample(dataset, target_sample_rate=16000):
 
 
 def modify_df():
-    folder = 'ItalianPD'
+    folder = 'IPVS'
     store_location = os.path.join(data_dir, 'preprocessed_data')
     df = pd.read_csv(os.path.join(store_location, f'{folder}_ifm.csv'))
     print(df.columns)
@@ -280,30 +283,35 @@ def modify_orig_id(row):
         return int(row['ORIG_ID'])
 
 
-def combine_rows():
-    data1 = 'NeuroVoz'
-    data2 = 'MDVR'
-    data3 =  'PCGITA'
-    datasets = '_tdu_norm_ifm'
+def combine_rows(sets,d1,d2,d3=None):
     store_location = os.path.join(data_dir, 'preprocessed_data')
-    df = pd.read_csv(os.path.join(store_location, f'{data1}{datasets}.csv'))
-    df2 = pd.read_csv(os.path.join(store_location, f'{data2}{datasets}.csv'))
+    df = pd.read_csv(os.path.join(store_location, f'{d1}{sets}.csv'))
+    df2 = pd.read_csv(os.path.join(store_location, f'{d2}{sets}.csv'))
     df2['subject_id'] = df2.apply(lambda x: int(x['subject_id']) + 200, axis=1)
     df2['sample_id'] = df2.apply(lambda x: int(x['sample_id']) + 200, axis=1)
    
-    if data3:
-        df3 = pd.read_csv(os.path.join(store_location, f'{data3}{datasets}.csv'))
+    if d3:
+        df3 = pd.read_csv(os.path.join(store_location, f'{d3}{sets}.csv'))
         df3['subject_id'] = df3.apply(lambda x: int(x['subject_id']) + 400, axis=1)
         df3['sample_id'] = df3.apply(lambda x: int(x['sample_id']) + 400, axis=1)
         df_all = pd.concat([df, df2, df3])
-        dfname = f'{data1}{data2}{data3}{datasets}.csv'
+        dfname = f'{d1}{d2}{d3}{sets}.csv'
     else:
         df_all = pd.concat([df, df2])
-        dfname = f'{data1}{data2}{datasets}.csv'
-    print(df_all.columns, df_all.shape)
+        dfname = f'{d1}{d2}{sets}.csv'
+    print(dfname, df_all.columns, df_all.shape)
     df_all.to_csv(os.path.join(store_location,dfname), index=False)
 
-# combine_rows()
+# combine_rows('PCGITA', 'IPVS', 'MDVR', '_tdu_norm_vgg')
+
+def combine_sets():
+    for ds in [#('NeuroVoz', 'PCGITA', 'IPVS'), ('NeuroVoz', 'PCGITA', 'MDVR'), 
+               #('NeuroVoz', 'IPVS', 'MDVR'), 
+               ('PCGITA', 'IPVS')]: #'MDVR'
+        for sets in ['_tdu', '_ddk']:
+            for norm in ['_norm_ifm', '_norm_vgg']:
+                combine_rows(sets+norm, ds[0], ds[1])
+
 
 def combine_columns():
     store_location = os.path.join(data_dir, 'preprocessed_data')
@@ -379,3 +387,13 @@ def add_dataset_col():
         df['dataset'] = dataset
         print(df.shape, df.columns)
         df.to_csv(os.path.join(store_location, file), index=False)
+
+def replace_filename():
+    old = "SVM"
+    new = 'SGD'
+    cwd = os.path.abspath(os.getcwd())
+    folder_path = os.path.join(cwd,'experiments')
+    for file_name in os.listdir(folder_path):
+        if old in file_name:
+            new_name = file_name.replace(old, new)
+            os.rename(os.path.join(folder_path, file_name), os.path.join(folder_path, new_name))
