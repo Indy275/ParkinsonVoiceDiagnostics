@@ -68,30 +68,21 @@ def measurePitch(sound, f0min, f0max):
 
 
 def measureFormants(sound, f0min, f0max):
-    pointProcess = call(sound, "To PointProcess (periodic, cc)", f0min, f0max)
-    formants = call(sound, "To Formant (burg)", 0.0025, 5, 5000, 0.025, 50)
-    numPoints = call(pointProcess, "Get number of points")
-
-    f1_list = []
-    f2_list = []
-    f3_list = []
-    f1bw_list = []
-    f2bw_list = []
-    f3bw_list = []
-    # Measure formants only at glottal pulses
-    for point in range(0, numPoints):
-        point += 1
-        t = call(pointProcess, "Get time from index", point)
-        f1 = call(formants, "Get value at time", 1, t, 'Hertz', 'Linear')
-        f2 = call(formants, "Get value at time", 2, t, 'Hertz', 'Linear')
-        f3 = call(formants, "Get value at time", 3, t, 'Hertz', 'Linear')
+    formants = sound.to_formant_burg(time_step=0.010, maximum_formant=5000)
+        
+    f1_list, f2_list, f3_list  = [], [], []
+    f1bw_list, f2bw_list, f3bw_list = [], [], []
+    for t in formants.ts():
+        f1 = formants.get_value_at_time(1, t)
+        f2 = formants.get_value_at_time(2, t)
+        f3 = formants.get_value_at_time(3, t)
         f1_list.append(f1)
         f2_list.append(f2)
         f3_list.append(f3)
 
-        f1bw = call(formants, "Get bandwidth at time", 1, t, 'Hertz', 'Linear')
-        f2bw = call(formants, "Get bandwidth at time", 2, t, 'Hertz', 'Linear')
-        f3bw = call(formants, "Get bandwidth at time", 3, t, 'Hertz', 'Linear')
+        f1bw = formants.get_bandwidth_at_time(1, t)
+        f2bw = formants.get_bandwidth_at_time(2, t)
+        f3bw = formants.get_bandwidth_at_time(3, t)
         f1bw_list.append(f1bw)
         f2bw_list.append(f2bw)
         f3bw_list.append(f3bw)
@@ -129,8 +120,8 @@ def get_mfcc(x):
 def get_features(x):
     sound = parselmouth.Sound(x, sampling_frequency=sr)
     f0_feats = get_f0(sound)
-    formants = measureFormants(sound, fmin, fmax)
     jitter_shimmer = measurePitch(sound, fmin, fmax)
+    formants = measureFormants(sound, fmin, fmax)
     mfcc_feats = get_mfcc(x)
 
     # [6, 5, 6, 6, 156]

@@ -93,7 +93,7 @@ def create_features(dataset, ifm_nifm):
 
         x, sr = librosa.core.load(path_to_file, sr=16000)
         chunks = split_audio(x, sr)
-        for chunk in chunks:
+        for i, chunk in enumerate(chunks):
             if len(chunk) < 24000:  # at least 1.5 seconds of audio
                 continue
             
