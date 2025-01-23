@@ -26,12 +26,16 @@ tgt_gender = config.getint('EXPERIMENT_SETTINGS', 'tgt_gender')
 
 pd.options.mode.chained_assignment = None  # default='warn'
 
-cwd = os.path.abspath(os.getcwd())
-experiment_folder = os.path.join(cwd,'experiments')
+if os.getenv("COLAB_RELEASE_TAG"):  # colab
+    experiment_folder = '/content/drive/My Drive/RAIVD_data/experiments/'
+else:
+    cwd = os.path.abspath(os.getcwd())
+    experiment_folder = os.path.join(cwd,'experiments')
 if not os.path.exists(experiment_folder):
     os.makedirs(experiment_folder)
     df = pd.DataFrame(columns=['dataset','model','ifm_nifm','fMACC','fMAUC','sMACC','sMAUC'])
     df.to_csv(os.path.join(experiment_folder,'monolingual_result.csv'), index=False)
+    df.to_csv(os.path.join(experiment_folder,'crosslingual_result.csv'), index=False)
 
 
 def get_model(modeltype):
@@ -59,8 +63,8 @@ def prepare_data(dataset, ifm_nifm, gender, addition=''):
 
     # Experiment: train model to separate data sets
     if False:
-        dataset1 = 'CzechPD_a'
-        dataset2 = 'NeuroVoz_a'
+        dataset1 = 'NeuroVoz_tdu'
+        dataset2 = 'PCGITA_tdu'
         df1, n_features = load_data(dataset1, ifm_nifm)
         df2, n_features = load_data(dataset2, ifm_nifm)
         df1 = df1[df1['y']==0]
@@ -123,9 +127,7 @@ def run_monolingual(dataset, ifm_nifm, modeltype, k=2):
     data_splits = prepare_train_test(model, df, n_features, k)
 
     file_metrics, subject_metrics, fimps = [], [], []
-    for i, split in tqdm(enumerate(data_splits)):
-        # if i % int(len(data_splits)/3) == 0:
-            # print(f"Running {modeltype} with data split [{i+1}/{len(data_splits)}]")
+    for split in tqdm(data_splits):
         scaler, model, base_df, base_train_idc, base_test_idc = split
         # Create base train and test set based on split indices
         train_df = base_df.loc[base_train_idc, :]
@@ -190,7 +192,7 @@ def run_monolingual(dataset, ifm_nifm, modeltype, k=2):
     print(f"Mean {k}-fold AUC {model.name}-{ifm_nifm} on {dataset}:", subject_scores[1])
     
     if k >= 5:   # write results only when at least 5-fold crossvalidation is done
-        with open('experiments/monolingual_result.csv', 'a') as f:
+        with open(os.path.join(experiment_folder, 'monolingual_result.csv'), 'a') as f:
             result = f'\n{dataset},{model.name},{ifm_nifm},{file_scores[0]},{file_scores[1]},{subject_scores[0]},{subject_scores[1]}'
             f.write(result)
 
@@ -281,9 +283,8 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, modeltype, k=2):
     data_splits = prepare_train_test(model, base_df, n_features, k)
 
     file_metrics, subject_metrics, base_metrics = [], [], []
-    for i, split in enumerate(data_splits):
-        if i % int(len(data_splits)/3) == 0:
-            print(f"Running {modeltype} with data split [{i+1}/{len(data_splits)}]")
+    for split in tqdm(data_splits):
+    
         scaler, model, base_df, base_train_idc, base_test_idc = split
         
         # Create base train and test set based on split indices
@@ -311,7 +312,7 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, modeltype, k=2):
         file_metric, subject_metric, base_metric, n_tgt_train_samples = zip(*metrics)
 
         if print_intermediate:
-            print(f"Average result for data fold [{i+1}/{len(data_splits)}]:\nFile metrics:",np.mean(file_metric, axis=0))
+            print(f"Average result:\nFile metrics:",np.mean(file_metric, axis=0))
             print("Subject metrics:",np.mean(subject_metric, axis=0),"\nBase metrics:",np.mean(base_metric, axis=0))
 
         file_metrics.append(file_metric)
@@ -321,17 +322,17 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, modeltype, k=2):
     if fewshot:
         fmetrics_df = pd.DataFrame(np.mean(file_metrics, axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
         fmetrics_df['Iteration'] = n_tgt_train_samples
-        fmetrics_df.to_csv(os.path.join('experiments', f'{modeltype}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}.csv'), index=False)
+        fmetrics_df.to_csv(os.path.join(experiment_folder, f'{modeltype}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}.csv'), index=False)
 
         smetrics_df = pd.DataFrame(np.mean(subject_metrics,axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
         smetrics_df['Iteration'] = n_tgt_train_samples
-        smetrics_df.to_csv(os.path.join('experiments', f'{modeltype}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}_grouped.csv'), index=False)
+        smetrics_df.to_csv(os.path.join(experiment_folder, f'{modeltype}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}_grouped.csv'), index=False)
         
         base_metrics_df = pd.DataFrame(np.mean(base_metrics,axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
         base_metrics_df['Iteration'] = n_tgt_train_samples
-        base_metrics_df.to_csv(os.path.join('experiments', f'{modeltype}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}_base.csv'), index=False)
+        base_metrics_df.to_csv(os.path.join(experiment_folder, f'{modeltype}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}_base.csv'), index=False)
         
-        print(f'Metrics saved to: experiments/{modeltype}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}.csv')
+        print(f'Metrics saved to: {experiment_folder}{modeltype}_{ifm_nifm}_metrics_{base_dataset}_{target_dataset}.csv')
     else:  # No Few-Shot
         file_scores, subject_scores, base_scores = [], [], []
         score_names = ['Mean Acc:', 'Mean AUC:', 'Mean Sens:', 'Mean Spec:']
@@ -356,7 +357,7 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, modeltype, k=2):
                 print(name, score)
         
         if k >= 5:   # write results of at least 5-fold crossvalidated results
-            with open('experiments/crosslingual_result.csv', 'a') as f:
+            with open(os.path.join(experiment_folder,'crosslingual_result.csv'), 'a') as f:
                 result = f'\n{base_dataset}_{target_dataset},{model.name},{ifm_nifm},{file_scores[0]},{file_scores[1]},{subject_scores[0]},{subject_scores[1]}'
                 f.write(result)
 
