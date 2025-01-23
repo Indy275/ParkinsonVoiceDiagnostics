@@ -17,18 +17,19 @@ elif os.name == 'posix':  # linux
 elif os.name == 'nt':  # windows
     data_dir = "C:\\Users\INDYD\Documents\RAIVD_data\\"
 
-dataset1 = 'ItalianPD'  # NeuroVoz ItalianPD PCGITA CzechPD
+dataset1 = 'IPVS'  # NeuroVoz IPVS PCGITA CzechPD
 dataset2 = 'NeuroVoz'
-dataset3 = 'CzechPD'
-dataset4 = 'PCGITA'
-datasets = [dataset1, dataset2, dataset4]
+dataset3 = 'PCGITA'
+dataset4 = 'MDVR'
+datasets = [dataset1, dataset2, dataset3]#, dataset4]
 
-speech_task = 'tdu'  
+speech_task = 'sp'  
 
-ifm_or_nifm = 'vgg'
+ifm_or_nifm = 'ifm'
 
+markers = ['o', 's', 'D', 'v']
 cpals = ['viridis',  'cubehelix', 'magma', 'Spectral']  # 'coolwarm',
-cpals = ['coolwarm'] * 4  # This shows difference between PD and HC across datasets
+# cpals = ['coolwarm'] * 4  # This shows difference between PD and HC across datasets
 
 dfs, setnames = [], []
 for dataset in datasets:
@@ -58,13 +59,23 @@ df['ID'] = id.values
 
 plt.figure(figsize=(6, 6))
 
-for dataset, cpal in zip(setnames, cpals):
+colors = sns.color_palette("tab10", len(setnames))  # One color per dataset
+mark = ['o', 's']  # One marker per class
+
+# for i, dataset in enumerate(setnames):
+#     cur_df = df[df['ID']== dataset] 
+#     for j, label in enumerate([0, 1]):  # Loop over binary classes
+#         subset = cur_df[cur_df['y'] == label]
+#         ax = sns.scatterplot(x="tsne-2d-one", y="tsne-2d-two", label=f'{dataset}', color=colors[i], marker=mark[j], data=subset, alpha=0.75)
+        
+for dataset, cpal, m in zip(setnames, cpals, markers):
     cur_df = df[df['ID']== dataset] 
-    ax = sns.scatterplot(x="tsne-2d-one", y="tsne-2d-two", hue="y", palette=sns.color_palette(cpal, 2), data=cur_df, alpha=0.75)
-ax.set(xlabel='First dimension', ylabel='Second dimension', title=f'{setnames}: {X.shape[1]} features compressed into two dimensions')
+    ax = sns.scatterplot(x="tsne-2d-one", y="tsne-2d-two", hue="y", palette=sns.color_palette(cpal, 2), marker=m, data=cur_df, alpha=0.75)
+setnames = [s.split('_')[0] for s in setnames]
+ax.set(xlabel='First dimension', ylabel='Second dimension', title=f"tSNE visualisation of {' '.join(setnames)} \n {X.shape[1]} features compressed into two dimensions")
 
 path = r"C:\Users\INDYD\Dropbox\Uni MSc AI\Master_thesis_RAIVD\imgs"
 if os.path.exists(path): # Only when running on laptop
-    plt.savefig(os.path.join(path,f'tSNE_{ifm_or_nifm}_{setnames}.png'))
-    print("tSNE plot saved to "+f'{path}\tSNE_{ifm_or_nifm}_{setnames}.png')
+    plt.savefig(os.path.join(path,f"tSNE_{ifm_or_nifm}_{'_'.join(setnames)}.png"))
+    print("tSNE plot saved to "+f"{path} tSNE_{ifm_or_nifm}_{'_'.join(setnames)}.png")
 plt.show()
