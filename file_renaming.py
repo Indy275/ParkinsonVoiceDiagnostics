@@ -389,11 +389,29 @@ def add_dataset_col():
         df.to_csv(os.path.join(store_location, file), index=False)
 
 def replace_filename():
-    old = "SVM"
-    new = 'SGD'
+    old = "_a_"
+    new = '_sp_'
     cwd = os.path.abspath(os.getcwd())
     folder_path = os.path.join(cwd,'experiments')
+    # folder_path = os.path.join(data_dir, 'preprocessed_data')
+    
     for file_name in os.listdir(folder_path):
         if old in file_name:
             new_name = file_name.replace(old, new)
             os.rename(os.path.join(folder_path, file_name), os.path.join(folder_path, new_name))
+
+
+def rename_dataset_col():
+    store_location = os.path.join(data_dir, 'preprocessed_data')
+
+    for file in os.listdir(store_location):
+        if file.startswith('IPVS'):
+            df = pd.read_csv(os.path.join(store_location, file))
+            df['dataset'] = 'IPVS_' + df.at[0, 'dataset'].split('_')[1]
+            print(df.head(1))
+            df.to_csv(os.path.join(store_location, file), index=False)
+        if '_sp_' in file:
+            df = pd.read_csv(os.path.join(store_location, file))
+            df['dataset'] = df.at[0, 'dataset'].split('_')[0] + '_sp'
+            print(df.head(1))
+            df.to_csv(os.path.join(store_location, file), index=False)
