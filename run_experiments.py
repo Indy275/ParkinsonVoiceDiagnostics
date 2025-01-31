@@ -34,7 +34,8 @@ else:
 if not os.path.exists(experiment_folder):
     os.makedirs(experiment_folder)
     df = pd.DataFrame(columns=['dataset','model','ifm_nifm','fMACC','fMAUC','sMACC','sMAUC'])
-    df.to_csv(os.path.join(experiment_folder,'monolingual_result.csv'), index=False)
+    df.to_csv(os.path.join(experiment_folder,'mono_result.csv'), index=False)
+
     df.to_csv(os.path.join(experiment_folder,'crosslingual_result.csv'), index=False)
 
 
@@ -56,9 +57,11 @@ def prepare_data(dataset, ifm_nifm, gender, addition=''):
     for ds in dataset.split('_')[:-1]:
         df, n_features = load_data(f"{ds}_{dataset.split('_')[-1]}", ifm_nifm)
         n_feat.append(n_features)
+        df['subject_id'] = df['subject_id'].astype(str) + df['dataset']
         dfs.append(df)
     df = pd.concat(dfs)
     df['sample_id'] = df['sample_id'].astype(str) + addition
+    df.reset_index(drop=True, inplace=True)
     assert len(set(n_feat)) == 1, "Number of features across datasets should be equal: {}".format(n_feat)
 
     # Experiment: train model to separate data sets
@@ -84,11 +87,11 @@ def prepare_data(dataset, ifm_nifm, gender, addition=''):
 
 def prepare_train_test(base_model, base_df, base_features, k):
     base_df_split = base_df.drop_duplicates(['subject_id'])
-    base_df_split.loc[:,'ygender'] = base_df_split['y'].astype(str) + '_' + base_df_split['gender'].astype(str)
+    base_df_split.loc[:,'ygender'] = base_df_split['y'].astype(str) + '_' + base_df_split['gender'].astype(str) #+ '_' + base_df_split['dataset'].astype(str)
     k = min(k, np.min(list(np.unique(base_df_split['ygender'], return_counts=True)[1])))
     
     data_splits = []
-    outer_k = 3
+    outer_k = 4
     for _ in range(outer_k):
         kf = StratifiedKFold(n_splits=k, shuffle=True)
         for train_split_indices, test_split_indices in kf.split(base_df_split['subject_id'], base_df_split['ygender']):
@@ -99,7 +102,9 @@ def prepare_train_test(base_model, base_df, base_features, k):
             test_subjects = base_df_split.iloc[test_split_indices]['subject_id']
             train_indices = base_df_copy[base_df_copy['subject_id'].isin(train_subjects)].index.tolist()
             test_indices = base_df_copy[base_df_copy['subject_id'].isin(test_subjects)].index.tolist()
-
+            # print("tr",train_indices, len(train_indices), len(set(train_indices)))
+            # print("te",test_indices, len(test_indices), len(set(test_indices)))
+            # print("inter",set(train_indices).intersection(set(test_indices)))
             scaler, base_df_copy = scale_features(base_df_copy, base_features, train_indices, test_indices)
             data_splits.append([scaler, model, base_df_copy, train_indices, test_indices])
     return data_splits
@@ -140,8 +145,16 @@ def run_monolingual(dataset, ifm_nifm, modeltype, k=2):
             test_df = test_df[test_df['dataset']==dataset]
 
         if print_intermediate:
-            print("Train subjects:", np.sort(base_df.loc[base_train_idc, 'subject_id'].unique()))
-            print("Test subjects:", np.sort(base_df.loc[base_test_idc, 'subject_id'].unique()))
+            train_df = (base_df.loc[base_train_idc, :])
+            test_df = (base_df.loc[base_test_idc, :])
+            for dataset_name, group in train_df.groupby('dataset'):
+                print(f"Train Dataset: {dataset_name}")
+                print("Subject IDs:", np.sort(group['subject_id'].unique()))
+                print()
+            for dataset_name, group in test_df.groupby('dataset'):
+                print(f"Test Dataset: {dataset_name}")
+                print("Subject IDs:", np.sort(group['subject_id'].unique()))
+                print()
             print("Train %PD:",round(base_df.loc[base_train_idc, 'y'].sum()/ len(base_train_idc),3))
             print("Test %PD:",round(base_df.loc[base_test_idc, 'y'].sum()/ len(base_test_idc),3))
             print("Train %male",round(base_df.loc[base_train_idc, 'gender'].sum()/ len(base_train_idc),3))
@@ -192,7 +205,7 @@ def run_monolingual(dataset, ifm_nifm, modeltype, k=2):
     print(f"Mean {k}-fold AUC {model.name}-{ifm_nifm} on {dataset}:", subject_scores[1])
     
     if k >= 5:   # write results only when at least 5-fold crossvalidation is done
-        with open(os.path.join(experiment_folder, 'monolingual_result.csv'), 'a') as f:
+        with open(os.path.join(experiment_folder, 'mono_result.csv'), 'a') as f:
             result = f'\n{dataset},{model.name},{ifm_nifm},{file_scores[0]},{file_scores[1]},{subject_scores[0]},{subject_scores[1]}'
             f.write(result)
 
