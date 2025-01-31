@@ -40,7 +40,8 @@ def plot_TL_performance(base_dataset, target_dataset):
     metrics_grouped = pd.read_csv(os.path.join(experiment_folder, f'{clf_name}_{ifm_or_nifm}_metrics_{base_dataset}_{target_dataset}_grouped.csv'))
     base_metrics = pd.read_csv(os.path.join(experiment_folder, f'{clf_name}_{ifm_or_nifm}_metrics_{base_dataset}_{target_dataset}_base.csv'))
     mono = pd.read_csv(os.path.join(experiment_folder, f'monolingual_result.csv'))
-    tgt_mono = mono[(mono['dataset']==target_dataset) & (mono['model']==clf_name[:3]) & (mono['ifm_nifm']==ifm_or_nifm)]
+    ds = target_dataset.split('_')
+    tgt_mono = mono[(mono['dataset']==ds[0]) & (mono['task']==ds[1]) & (mono['ifm_nifm']==ifm_or_nifm)]
 
     if base_dataset[-3:] != 'tdu' and base_dataset[-3:] != 'ddk':  # file level preds can differ from speaker-level preds!
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 4))
@@ -131,9 +132,12 @@ def fimp_plot(fimp, df):
          (fl[5] - fl[4]) / 8 + fl[4], (fl[5] - fl[4]) / 8 * 3 + fl[4], (fl[5] - fl[4]) / 8 * 6, (fl[5] - fl[4]) ],
         ['F0', 'Jitter', 'Shimmer', 'Formants', f'MFCC \n Mean', f'MFCC \n Std. Dev.', f'MFCC \n Skewness', f'MFCC \n Kurtosis'])
     plt.xlabel("Relative feature importance")
-    plt.title(f"Feature importance for the IFM model on {' '.join([s for s in df.at[0, 'dataset'].split('_')])} data") 	
+    plt.title(f"Feature Importance on {' '.join([s for s in df.at[0, 'dataset'].split('_')])} data") 	
     plt.tight_layout()
     plt.ylim((fl[0], fl[-1]))
+    # xlim = fimp_sorted[0][1] + 0.01
+    # plt.xlim((0,xlim))
+    plt.xlim((0,0.08))
     fig.savefig(os.path.join(experiment_folder, f'fimp_{df.at[0, "dataset"]}.pdf'), dpi=300)
     plt.show()
 

@@ -5,29 +5,34 @@ import pandas as pd
 import os
 import configparser
 
-# NeuroVoz TDU, DDK. PCGITA TDU, DDK. IPVS TDU, DDK
-IFM = [0.862, 0.830, 0.750, 0.74, 1.0, 0.983]
+# NeuroVoz DDK, PCGITA TDU, IPVS SP
+Hubert0 = [.836, .793, .916]
 
-NIFM = [0.832, 0.80, 0.770, 0.700, 0.983, 0.935]
+Hubert1 = [.756, .8, .779]
 
-labs = ['TDU', 'DDK','TDU', 'DDK','TDU', 'DDK']
-indices = np.arange(len(IFM))  # the label locations
-width = 0.35  # the width of the bars
+labs = ['NeuroVoz\nDDK','PC-GITA\nTDU', 'IPVS\nSP']
+indices = np.arange(len(Hubert0))  # the label locations
+width = 0.2  # the width of the bars
 
 fig, ax = plt.subplots(figsize=(6, 4))
 
-bar1 = ax.bar(indices - width/2, IFM, width, label='IFM', capsize=5, color='g', alpha=0.7)
-bar2 = ax.bar(indices + width/2, NIFM, width, label='NIFM', capsize=5, color='r', alpha=0.7)
+colors = plt.cm.tab20b(np.linspace(0, 1, 20))
 
-ax.set_xlim((0.5, 1))
-ax.set_xlabel('\nData set')
+bar1 = ax.bar(indices, Hubert0, width, label='HuBERT-0', capsize=5, color=colors[14], alpha=0.7)
+bar2 = ax.bar(indices + width, Hubert1, width, label='HuBERT-1', capsize=5, color=colors[12], alpha=0.7)
+
+ax.set_ylim((0.5, 1))
+ax.set_xlabel('Data set and speech task')
 ax.set_ylabel('Model performance (AUC)')
-ax.set_title('Comparison of feature types on different data sets')
-ax.set_xticks(indices, labels=labs)
-sec = ax.secondary_xaxis(location=0)
-sec.set_xticks([0.5, 2.5, 4.5], labels=['\nNeuroVoz', '\nPC-GITA', '\nIPVS'])
-sec.xaxis.set_ticks_position('none') 
-ax.xaxis.set_ticks_position('none') 
+ax.set_title('Comparison of embeddings on various datasets and speech tasks')
+ax.set_xticks(indices + width/2, labels=labs)
+# sec = ax.secondary_xaxis(location=0)
+# sec.set_xticks([0.5, 1.5, 2.5], labels=['\nNeuroVoz', '\nPC-GITA', '\nIPVS'])
+# sec.xaxis.set_ticks_position('none') 
+# ax.xaxis.set_ticks_position('none') 
 ax.legend()
 plt.tight_layout()
+path = r"C:\Users\INDYD\Dropbox\Uni MSc AI\Master_thesis_RAIVD\imgs"
+if os.path.exists(path): # Only when running on laptop
+    plt.savefig(os.path.join(path,"monolingual_comp_plot.pdf"))
 plt.show()

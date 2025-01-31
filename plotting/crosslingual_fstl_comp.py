@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 import pandas as pd
 import os
+import numpy as np
 import configparser
 
 config = configparser.ConfigParser()
@@ -17,12 +18,14 @@ else:
 parent = os.path.dirname
 path = parent(parent(__file__))
 
-def make_plot(ax, metrics_df, title, color='purple', lab=None):
+def make_plot(ax, metrics_df, title, color='blue', lab=None):
     lbl = lab if lab else 'Target set'
     ax.plot(metrics_df['Iteration'], metrics_df['ROC_AUC'], label=lbl, marker='.', alpha=0.8, color=color, linewidth=1)
     ax.xaxis.set_major_locator(MaxNLocator(integer=True))
     ax.set_title(title)
-    ax.title.set_fontsize(10)
+    for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
+             ax.get_xticklabels() + ax.get_yticklabels()):
+        item.set_fontsize(10)
     ax.set_ylim((0.4,1.0))
     return ax
 
@@ -45,41 +48,41 @@ def plot_TL_performance(base_dataset, target_dataset, ifm_clf, nifm_clf, ax=None
         base_nifm = pd.read_csv(os.path.join(experiment_folder, f'{nifm_clf}_{nifm_model}_metrics_{base_dataset}_{target_dataset}_base.csv'))
 
     mono = pd.read_csv(os.path.join(experiment_folder, f'monolingual_result.csv'))
-    tgt_mono_ifm = mono[(mono['dataset']==target_dataset) & (mono['model']==ifm_clf) & (mono['ifm_nifm']=='ifm')]
-    tgt_mono_nifm = mono[(mono['dataset']==target_dataset) & (mono['model']==nifm_clf) & (mono['ifm_nifm']==nifm_model)]
+    ds = target_dataset.split('_')
+    tgt_mono_nifm = mono[(mono['dataset']==ds[0]) & (mono['task']==ds[1]) & (mono['ifm_nifm']==nifm_model)]
+    tgt_mono_ifm = mono[(mono['dataset']==ds[0]) & (mono['task']==ds[1])  & (mono['ifm_nifm']=='ifm')]
+
 
     if ax is None:
         ax2 = plt.subplot(1,1,1)
     else:
         ax2 = ax
 
-    if not firstcol:
-        ax2.set_yticklabels([])
-    else:
-        ax.set_ylabel('Performance (AUC)')
+    colors = plt.cm.tab20b(np.linspace(0, 1, 20))
+    c1 = colors[1]
+    c2 = colors[13]
 
-    if not lastrow:
-        ax2.set_xticklabels([])
-    else:
-        ax.set_xlabel('N-shots')
+    if firstcol:
+        ax2.set_ylabel('Performance (AUC)')
+    if lastrow:
+        ax2.set_xlabel('N-shots')
+        
+    title = f"{'+'.join(base_dataset.split('_')[:-1])} -> {target_dataset.replace('_', ' ')}" # {base_dataset.split('_')[-1]} 
+    make_plot(ax2, metrics_nifm, title, lab='Target set NIFM', color=c1)
+    make_plot(ax2, metrics_ifm, title, lab='Target set IFM', color=c2)
 
-    # ax2.plot(base_nifm['Iteration'], base_nifm['ROC_AUC'], label='Base NIFM', linestyle='dashed', color='blue' , marker='x', alpha=0.8, linewidth=1)
-    # ax2.plot(base_ifm['Iteration'], base_ifm['ROC_AUC'], label='Base IFM', linestyle='dashed',color='red', marker='x', alpha=0.8, linewidth=1)
+    ax2.axhline(y=tgt_mono_nifm['AUC'].iloc[-1], label='Target set NIFM baseline', linestyle='dotted', color=c1,linewidth=1)
+    ax2.axhline(y=tgt_mono_ifm['AUC'].iloc[-1], label='Target set IFM baseline', linestyle='dotted', color=c2, linewidth=1)
+    ax2.axhline(y=0.5, label='Random guessing', linestyle='dotted', color='k', linewidth=1)
 
-    if len(tgt_mono_ifm)>0 and len(tgt_mono_nifm)>0: # row exists
-            monoscore = tgt_mono_ifm['sMAUC'].iloc[-1]
-            ax2.axhline(y=monoscore, label='Target set monolingual IFM', linestyle='dotted', color='red',linewidth=1)
-            monoscore = tgt_mono_nifm['sMAUC'].iloc[-1]
-            ax2.axhline(y=monoscore, label='Target set monolingual NIFM', linestyle='dotted', color='blue',linewidth=1)
-    else:
-        print("Not in monolingual set:", target_dataset,   "IFM:",len(tgt_mono_ifm), ifm_clf ,f"{nifm_model}:",len(tgt_mono_nifm), nifm_clf)
-    
-    title = f"{'+'.join(base_dataset.split('_')[:-1])} \n -> {target_dataset.replace('_', ' ')}" # {base_dataset.split('_')[-1]} 
-    make_plot(ax2, metrics_ifm, title, lab='Target set IFM', color='red')
-    make_plot(ax2, metrics_nifm, title, lab='Target set NIFM', color='blue')
+   
+    ax2.plot(base_nifm['Iteration'], base_nifm['ROC_AUC'], label='Base set NIFM', linestyle='dashed', color=c1 , marker='x', alpha=0.7, linewidth=1)
+    ax2.plot(base_ifm['Iteration'], base_ifm['ROC_AUC'], label='Base set IFM', linestyle='dashed',color=c2, marker='x', alpha=0.7, linewidth=1)
 
     if legend:
-        leg = ax2.legend(bbox_to_anchor=(1, 2.2), bbox_transform=ax2.transAxes)
+        leg = ax2.legend(bbox_to_anchor=(0.8, 2.), bbox_transform=ax2.transAxes)
+        leg = ax2.legend(bbox_to_anchor=(1, 0.), loc='lower right', bbox_transform=ax2.transAxes)
+
         return ax2, leg
 
     plt.tight_layout()
@@ -89,7 +92,10 @@ def plot_TL_performance(base_dataset, target_dataset, ifm_clf, nifm_clf, ax=None
 
 
 if __name__ == "__main__":
-    clf_name = 'SGD'
-    base = 'NeuroVozPCGITAIPVS_tdu'
+    ifm_clf, nifm_clf = 'SGD', 'SGD'
+    base = 'NeuroVoz_PCGITA_IPVS_tdu'
     tgt = 'MDVR_tdu'
-    plot_TL_performance(base, tgt, clf_name)
+    plot, legend = plot_TL_performance(base, tgt, ifm_clf, nifm_clf)
+    plot.add_artist(legend)
+    
+    plt.savefig(os.path.join(experiment_folder, 'FSTL_example_MDVR_tdu.pdf'))
