@@ -3,6 +3,7 @@ import os.path
 import librosa
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 from file_util import load_files, get_dirs
 
@@ -87,8 +88,7 @@ def create_features(dataset, ifm_nifm):
 
     X, y, subj_id, sample_id, gender, dataset_id = [], [], [], [], [], []
 
-    for id, file in enumerate(files):
-        print("Processing file [{}/{}]".format(id+1, len(files)))
+    for id, file in enumerate(tqdm(files)):
         path_to_file = os.path.join(dir, file) + '.wav'
 
         x, sr = librosa.core.load(path_to_file, sr=16000)
