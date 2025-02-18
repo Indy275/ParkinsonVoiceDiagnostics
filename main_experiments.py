@@ -1,5 +1,5 @@
-from run_experiments import run_monolingual, run_crosslingual
-from plotting import crosslingual_fstl_comp
+from run_experiments import run_monolingual, run_crosslingual, run_fs
+from plotting import crosslingual_fstl_comp, IFM_NIFM_FSTL_plot
 import matplotlib.pyplot as plt
 import os 
 import pandas as pd
@@ -8,7 +8,7 @@ if os.getenv("COLAB_RELEASE_TAG"):  # colab
     experiment_folder = '/content/drive/My Drive/RAIVD_data/experiments/'
 else:
     cwd = os.path.abspath(os.getcwd())
-    experiment_folder = os.path.join(cwd,'crosslingual_experiments')
+    experiment_folder = os.path.join(cwd,'experiments')
 
 def run_mono(models, ds, st, base_dataset, feat):
     best_clf = None
@@ -30,6 +30,7 @@ def run_cross(models, ifm_or_nifm, ds, st, base_dataset, target_dataset):
         ifm_nifm_clf.append(best_clf)
         run_crosslingual(base_dataset, target_dataset, feat, modeltype=best_clf, k=5)
 
+
 def run_monolingual_experiments():
     models = ['SGD']#, 'DNN']
     datasets = ['PCGITA', 'NeuroVoz', 'IPVS', 'MDVR']
@@ -43,7 +44,7 @@ def run_monolingual_experiments():
                 run_mono(models, ds, st, base_dataset, feat)
                 
 
-def get_min_max_improvement(base_dataset,target_dataset, ifm_clf='SGD', nifm_clf='SGD'):
+def get_min_max_improvement(base_dataset,target_dataset, ifm_min, ifm_max, nifm_min, nifm_max, ifm_clf='SGD', nifm_clf='SGD'):
     nifm_model = 'hubert0'
     try:
         metrics_ifm = pd.read_csv(os.path.join(experiment_folder, f'{ifm_clf}_ifm_metrics_{base_dataset}_{target_dataset}_grouped.csv'))
@@ -56,21 +57,38 @@ def get_min_max_improvement(base_dataset,target_dataset, ifm_clf='SGD', nifm_clf
         nifm_clf = 'DNN' if nifm_clf == 'SGD' else 'SGD'
         metrics_nifm = pd.read_csv(os.path.join(experiment_folder, f'{nifm_clf}_{nifm_model}_metrics_{base_dataset}_{target_dataset}_grouped.csv'))
 
-    ifm_imp = metrics_ifm['ROC_AUC'].max() - metrics_ifm['ROC_AUC'].min()
-    nifm_imp = metrics_nifm['ROC_AUC'].max() - metrics_nifm['ROC_AUC'].min()
-    return ifm_imp, nifm_imp
+    half_data = len(metrics_ifm)//2
+
+    # ifm_imp = metrics_ifm['ROC_AUC'].max() - metrics_ifm['ROC_AUC'].min()
+    # nifm_imp = metrics_nifm['ROC_AUC'].max() - metrics_nifm['ROC_AUC'].min()
+    ifm_imp = metrics_ifm['ROC_AUC'].iloc[half_data:].max() - metrics_ifm['ROC_AUC'].iloc[half_data:].min()
+    nifm_imp = metrics_nifm['ROC_AUC'].iloc[half_data:].max() - metrics_nifm['ROC_AUC'].iloc[half_data:].min()
+
+    # last_sample = len(metrics_ifm)-1
+    # ifm_imp = metrics_nifm['ROC_AUC'].iloc[last_sample] - metrics_ifm['ROC_AUC'].iloc[last_sample]
+
+    if ifm_imp < ifm_min:
+        ifm_min = ifm_imp
+    if ifm_imp > ifm_max:    
+        ifm_max = ifm_imp
+    if nifm_imp < nifm_min:
+        nifm_min = nifm_imp
+    if nifm_imp > nifm_max:   
+        nifm_max = nifm_imp
+    return ifm_min, ifm_max, nifm_min, nifm_max
 
 # run_all_experiments()
 
 
 def run_selected_crosslingual_experiments():
-    run_models = True
-    models = ['SGD', 'DNN']
-    speech_task = 'sp' # ['sp', 'ddk','tdu' ]	
+    ifm_min, nifm_min, ifm_max, nifm_max = 1, 1, 0, 0
+    run_models = False
+    models = ['SGD']
+    speech_task = 'tdu' # ['sp', 'ddk','tdu' ]	
     
     target = 'NeuroVoz'
-    base = ['PCGITA', 'IPVS']
-    ifm_or_nifm = ['ifm', 'hubert0']
+    base = ['PCGITA',  'IPVS','MDVR']
+    ifm_or_nifm = ['ifm']
 
     fig = plt.figure(figsize=(8,6))
     ax = fig.add_subplot(1,1,1)
@@ -81,10 +99,14 @@ def run_selected_crosslingual_experiments():
     base_dataset = base + '_' + speech_task
     target_dataset = target + '_' + speech_task
     if run_models:
-        run_cross(models, ifm_or_nifm, target, speech_task, base_dataset, target_dataset)
+        run_fs(target_dataset, 'IFM', modeltype='SGD', k=5)
+
+        # run_cross(models, ifm_or_nifm, target, speech_task, base_dataset, target_dataset)
 
     print(f"Started plotting {base_dataset} and {target_dataset} data ")
     legend = True
+    # subplot = crosslingual_fstl_comp.plot_TL_performance(base_dataset, target_dataset, ifm_nifm_clf[0],ifm_nifm_clf[1], ax, True, True, legend=legend)
+
     try:
         subplot = crosslingual_fstl_comp.plot_TL_performance(base_dataset, target_dataset, ifm_nifm_clf[0],ifm_nifm_clf[1], ax, True, True, legend=legend)
     except:
@@ -93,15 +115,16 @@ def run_selected_crosslingual_experiments():
 
     if legend:
         subplot, legend = subplot
-    fig.add_artist(legend)
+        fig.add_artist(legend)
+    ifm_min, ifm_max, nifm_min, nifm_max = get_min_max_improvement(base_dataset,target_dataset,  ifm_min, ifm_max, nifm_min, nifm_max)
+    print("Min and max improvement:", ifm_min, ifm_max, nifm_min, nifm_max)
     
     plt.savefig(os.path.join(experiment_folder, f'fstlcomp_{base_dataset}_{target_dataset}.pdf'))
     plt.show()
 
 
 def run_ABCtoD_crosslingual_experiments():
-    ifm_min, ifm_max = 1, 0
-    nifm_min, nifm_max = 1, 0
+    ifm_min, nifm_min, ifm_max, nifm_max = 1, 1, 0, 0
     run_models = False
     models = ['SGD', 'DNN']
     speech_task = ['sp', 'ddk','tdu' ]	
@@ -143,24 +166,16 @@ def run_ABCtoD_crosslingual_experiments():
                 subplot, legend = subplot
             extent = subplot.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
             fig.savefig(os.path.join(experiment_folder, f'fstlcomp_{base_dataset}_{target_dataset}'), bbox_inches=extent.expanded(1.2, 1.3), dpi=300)
-            ifm_imp ,nifm_imp = get_min_max_improvement(base_dataset,target_dataset)
-            if ifm_imp < ifm_min:
-                ifm_min = ifm_imp
-            if ifm_imp > ifm_max:    
-                ifm_max = ifm_imp
-            if nifm_imp < nifm_min:
-                nifm_min = nifm_imp
-            if nifm_imp > nifm_max:   
-                nifm_max = nifm_imp
+            ifm_min, ifm_max, nifm_min, nifm_max = get_min_max_improvement(base_dataset,target_dataset,  ifm_min, ifm_max, nifm_min, nifm_max)
     print("Min and max improvement across datasets:", ifm_min, ifm_max, nifm_min, nifm_max)
     fig.add_artist(legend)
     
-    plt.savefig(os.path.join(experiment_folder, 'crosslingual_fstl_comp.pdf'))
+    plt.savefig(os.path.join(experiment_folder, 'crosslingual_fstl_compifmnifm.pdf'))
     plt.show()
     
 
 def run_both_crosslingual_experiments():
-    run_models = True
+    run_models = False
     models = ['SGD', 'DNN']
     
     datasets = ['NeuroVoz', 'PCGITA', 'IPVS', 'MDVR']
@@ -183,7 +198,7 @@ def run_both_crosslingual_experiments():
             axis = ax[ind][datasets.index(ds)]
             legend = True if ind==0 and datasets.index(ds)==cols-1 else False
             try:
-                crosslingual_fstl_comp.plot_TL_performance(base_dataset, target_dataset, ifm_nifm_clf[0],ifm_nifm_clf[1], axis, datasets.index(ds)==0, False, legend=legend)
+                IFM_NIFM_FSTL_plot.plot_TL_performance(base_dataset, target_dataset, ifm_nifm_clf[0],ifm_nifm_clf[1], axis, datasets.index(ds)==0, False, legend=legend)
             except:
                 run_cross(models, ifm_or_nifm, ds, st, base_dataset, target_dataset)
                 crosslingual_fstl_comp.plot_TL_performance(base_dataset, target_dataset, ifm_nifm_clf[0],ifm_nifm_clf[1], axis, datasets.index(ds)==0, False, legend=legend)
@@ -191,7 +206,7 @@ def run_both_crosslingual_experiments():
         base_dataset = '_'.join([dset for dset in datasets if not dset==ds]) + '_' + st
         print(f"Started plotting {base_dataset} and {target_dataset} data on {rows-1} {datasets.index(ds)}")
         try:
-            crosslingual_fstl_comp.plot_TL_performance(base_dataset, target_dataset, ifm_nifm_clf[0],ifm_nifm_clf[1], axis, datasets.index(ds)==0, True, legend=False)
+            IFM_NIFM_FSTL_plot.plot_TL_performance(base_dataset, target_dataset, ifm_nifm_clf[0],ifm_nifm_clf[1], axis, datasets.index(ds)==0, True, legend=False)
         except:
             run_cross(models, ifm_or_nifm, ds, st, base_dataset, target_dataset)
             crosslingual_fstl_comp.plot_TL_performance(base_dataset, target_dataset, ifm_nifm_clf[0],ifm_nifm_clf[1], axis, datasets.index(ds)==0, True, legend=False)    
@@ -199,10 +214,10 @@ def run_both_crosslingual_experiments():
     plt.show()
 
 if __name__ == "__main__":
-    run_monolingual_experiments()
+    # run_monolingual_experiments()
 
     # run_selected_crosslingual_experiments()
 
-    # run_ABCtoD_crosslingual_experiments()
+    run_ABCtoD_crosslingual_experiments()
 
     # run_both_crosslingual_experiments()

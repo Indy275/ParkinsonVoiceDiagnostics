@@ -35,14 +35,19 @@ def plot_TL_performance(base_dataset, target_dataset, ifm_clf, nifm_clf, ax=None
     try:
         metrics_ifm = pd.read_csv(os.path.join(experiment_folder, f'{ifm_clf}_ifm_metrics_{base_dataset}_{target_dataset}_grouped.csv'))
         base_ifm = pd.read_csv(os.path.join(experiment_folder, f'{ifm_clf}_ifm_metrics_{base_dataset}_{target_dataset}_base.csv'))
+        print(os.path.join(experiment_folder, f'{ifm_clf}_ifm_metrics_{base_dataset}_{target_dataset}_base.csv'))
     except:
+        print("IFM model not found, trying DNN")
         ifm_clf = 'DNN' if ifm_clf == 'SGD' else 'SGD'
         metrics_ifm = pd.read_csv(os.path.join(experiment_folder, f'{ifm_clf}_ifm_metrics_{base_dataset}_{target_dataset}_grouped.csv'))
         base_ifm = pd.read_csv(os.path.join(experiment_folder, f'{ifm_clf}_ifm_metrics_{base_dataset}_{target_dataset}_base.csv'))
     try:
         metrics_nifm = pd.read_csv(os.path.join(experiment_folder, f'{nifm_clf}_{nifm_model}_metrics_{base_dataset}_{target_dataset}_grouped.csv'))
         base_nifm = pd.read_csv(os.path.join(experiment_folder, f'{nifm_clf}_{nifm_model}_metrics_{base_dataset}_{target_dataset}_base.csv'))
+        print(os.path.join(experiment_folder, f'{nifm_clf}_{nifm_model}_metrics_{base_dataset}_{target_dataset}_base.csv'))
+
     except:
+        print("NIFM model not found, trying DNN")
         nifm_clf = 'DNN' if nifm_clf == 'SGD' else 'SGD'
         metrics_nifm = pd.read_csv(os.path.join(experiment_folder, f'{nifm_clf}_{nifm_model}_metrics_{base_dataset}_{target_dataset}_grouped.csv'))
         base_nifm = pd.read_csv(os.path.join(experiment_folder, f'{nifm_clf}_{nifm_model}_metrics_{base_dataset}_{target_dataset}_base.csv'))
