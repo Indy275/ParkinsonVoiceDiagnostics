@@ -6,8 +6,11 @@ import pandas as pd
 import configparser
 from tqdm import tqdm
 
+import matplotlib.pyplot as plt
 from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import roc_auc_score, accuracy_score, confusion_matrix, ConfusionMatrixDisplay
 from data_util import load_data, scale_features, get_samples
 from eval import evaluate_predictions
 
@@ -64,20 +67,6 @@ def prepare_data(dataset, ifm_nifm, gender, addition=''):
     df.reset_index(drop=True, inplace=True)
     assert len(set(n_feat)) == 1, "Number of features across datasets should be equal: {}".format(n_feat)
 
-    # Experiment: train model to separate data sets
-    if False:
-        dataset1 = 'NeuroVoz_tdu'
-        dataset2 = 'PCGITA_tdu'
-        df1, n_features = load_data(dataset1, ifm_nifm)
-        df2, n_features = load_data(dataset2, ifm_nifm)
-        df1 = df1[df1['y']==0]
-        df2 = df2[df2['y']==0]
-
-        df1.loc[:, 'y'] = 0
-        df2.loc[:, 'y'] =1
-        df = pd.concat([df1, df2])
-        print(df1.shape, df2.shape, df.shape)
-
     # Experiment: only include Male/Female participants
     if gender < 2:
         df = df[df['gender']==gender]
@@ -91,7 +80,7 @@ def prepare_train_test(base_model, base_df, base_features, k):
     k = min(k, np.min(list(np.unique(base_df_split['ygender'], return_counts=True)[1])))
     
     data_splits = []
-    outer_k = 4
+    outer_k = 10
     for _ in range(outer_k):
         kf = StratifiedKFold(n_splits=k, shuffle=True)
         for train_split_indices, test_split_indices in kf.split(base_df_split['subject_id'], base_df_split['ygender']):
@@ -102,9 +91,6 @@ def prepare_train_test(base_model, base_df, base_features, k):
             test_subjects = base_df_split.iloc[test_split_indices]['subject_id']
             train_indices = base_df_copy[base_df_copy['subject_id'].isin(train_subjects)].index.tolist()
             test_indices = base_df_copy[base_df_copy['subject_id'].isin(test_subjects)].index.tolist()
-            # print("tr",train_indices, len(train_indices), len(set(train_indices)))
-            # print("te",test_indices, len(test_indices), len(set(test_indices)))
-            # print("inter",set(train_indices).intersection(set(test_indices)))
             scaler, base_df_copy = scale_features(base_df_copy, base_features, train_indices, test_indices)
             data_splits.append([scaler, model, base_df_copy, train_indices, test_indices])
     return data_splits
@@ -220,7 +206,7 @@ def run_monolingual(dataset, ifm_nifm, modeltype, k=2):
 
 
 def run_fewshot(scaler, model, base_train_df, base_test_df, tgt_df, n_features):
-    base_df = pd.concat([base_train_df, base_test_df])
+    base_df = pd.concat([base_train_df, base_test_df], ignore_index=True)
     base_pos_subjs = list(base_df[base_df['y'] == 1]['subject_id'].unique())
     base_neg_subjs = list(base_df[base_df['y'] == 0]['subject_id'].unique())
 
@@ -254,14 +240,16 @@ def run_fewshot(scaler, model, base_train_df, base_test_df, tgt_df, n_features):
             tgt_train_df.iloc[:, :n_features] = scaler_copy.transform(tgt_train_df.iloc[:, :n_features].values)
 
             # Concatenate train data
-            tgt_train_df = pd.concat([tgt_train_df, base_train_df], ignore_index=True, axis=0)
-            
+            # tgt_train_df = pd.concat([tgt_train_df, base_train_df], ignore_index=True, axis=0)
             # Get target train data
             tgt_train_df, train_loader, n_features = model_copy.get_X_y(tgt_train_df, train=True)
             
             # Fine-tune model using target data
             model_copy.train(train_loader)
 
+        if n_shots == 0:
+            continue
+        
         # Prepare data for evaluation
         tgt_test_df.iloc[:, :n_features] = scaler_copy.transform(tgt_test_df.iloc[:, :n_features].values)
         tgt_test_df, tgt_X_test, tgt_y_test = model_copy.get_X_y(tgt_test_df)
@@ -374,4 +362,121 @@ def run_crosslingual(base_dataset, target_dataset, ifm_nifm, modeltype, k=2):
                 result = f'\n{base_dataset}_{target_dataset},{model.name},{ifm_nifm},{file_scores[0]},{file_scores[1]},{subject_scores[0]},{subject_scores[1]}'
                 f.write(result)
 
+def run_fs(target_dataset, ifm_nifm, modeltype, k=2):
+    model = get_model(modeltype)
 
+    target_df, tgt_features = prepare_data(target_dataset, ifm_nifm, tgt_gender, addition='tgt')
+    data_splits = prepare_train_test(model, target_df, tgt_features, k)
+    file_metrics, subject_metrics, base_metrics = [], [], []
+    for split in tqdm(data_splits):
+    
+        scaler, model, base_df, base_train_idc, base_test_idc = split
+        model.create_model(tgt_features)
+        scaler = StandardScaler()
+        metrics = run_fewshot(scaler, model, target_df, target_df, target_df, tgt_features)
+        file_metric, subject_metric, base_metric, n_tgt_train_samples = zip(*metrics)
+
+        if print_intermediate:
+            print(f"Average result:\nFile metrics:",np.mean(file_metric, axis=0))
+            print("Subject metrics:",np.mean(subject_metric, axis=0),"\nBase metrics:",np.mean(base_metric, axis=0))
+
+        file_metrics.append(file_metric)
+        subject_metrics.append(subject_metric)
+        base_metrics.append(base_metric)
+
+    if fewshot:
+        fmetrics_df = pd.DataFrame(np.mean(file_metrics, axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
+        fmetrics_df['Iteration'] = n_tgt_train_samples
+        fmetrics_df.to_csv(os.path.join(experiment_folder, f'{modeltype}_{ifm_nifm}_metrics_fewshot_{target_dataset}.csv'), index=False)
+
+        smetrics_df = pd.DataFrame(np.mean(subject_metrics,axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
+        smetrics_df['Iteration'] = n_tgt_train_samples
+        smetrics_df.to_csv(os.path.join(experiment_folder, f'{modeltype}_{ifm_nifm}_metrics_fewshot_{target_dataset}_grouped.csv'), index=False)
+        
+        base_metrics_df = pd.DataFrame(np.mean(base_metrics,axis=0), columns=['Accuracy', 'ROC_AUC', 'Sensitivity', 'Specificity'])
+        base_metrics_df['Iteration'] = n_tgt_train_samples
+        base_metrics_df.to_csv(os.path.join(experiment_folder, f'{modeltype}_{ifm_nifm}_metrics_fewshot_{target_dataset}_base.csv'), index=False)
+        
+        print(f'Metrics saved to: {experiment_folder}{modeltype}_{ifm_nifm}_metrics_fewshot_{target_dataset}.csv')
+    else:  # No Few-Shot
+        file_scores, subject_scores, base_scores = [], [], []
+        score_names = ['Mean Acc:', 'Mean AUC:', 'Mean Sens:', 'Mean Spec:']
+        for metric in np.mean(file_metrics, axis=0).flatten():
+            file_scores.append(round(metric, 3))
+        for metric in np.mean(subject_metrics, axis=0).flatten():
+            subject_scores.append(round(metric, 3))
+        for metric in np.mean(base_metrics, axis=0).flatten():
+            base_scores.append(round(metric, 3))
+
+        print("Target data (speaker-level) performance:")
+        for name, score in zip(score_names, subject_scores):
+                print(name, score)
+        
+        print("Base data performance:")
+        for name, score in zip(score_names, base_scores):
+                print(name, score)
+        
+        if k >= 5:   # write results of at least 5-fold crossvalidated results
+            with open(os.path.join(experiment_folder,'crosslingual_result.csv'), 'a') as f:
+                result = f'\nfewshot_{target_dataset},{model.name},{ifm_nifm},{file_scores[0]},{file_scores[1]},{subject_scores[0]},{subject_scores[1]}'
+                f.write(result)
+
+
+
+def run_dataset_separation():
+    # Experiment: train model to separate data sets
+    datasets = ['NeuroVoz', 'PCGITA', 'IPVS']
+    dfs = []
+    for i, ds in enumerate(datasets):
+        print(ds)
+        ds += '_sp'
+        df, n_features = load_data(ds, 'ifm')
+        df = df[df['y']==0]
+        df.loc[:, 'y'] = i
+        dfs.append(df)
+
+    df = pd.concat(dfs)
+
+    model = RandomForestClassifier()
+    kf = StratifiedKFold(n_splits=5, shuffle=False)
+    base_df = df.drop_duplicates(['subject_id'])
+
+    accs, rocs = [], []
+    conf_mats = []
+    for train_split_indices, test_split_indices in kf.split(base_df['subject_id'], base_df['dataset']):
+        train_subjects = base_df.iloc[train_split_indices]['subject_id']
+        test_subjects = base_df.iloc[test_split_indices]['subject_id']
+        train_indices = df[df['subject_id'].isin(train_subjects)].index.tolist()
+        test_indices = df[df['subject_id'].isin(test_subjects)].index.tolist()
+        X_train = df.iloc[train_indices, :n_features].values
+        y_train = df.iloc[train_indices, :]['y'].values
+        X_test = df.iloc[test_indices, :n_features].values
+        y_test = df.iloc[test_indices, :]['y'].values
+
+        model.fit(X_train, y_train)
+        preds = model.predict_proba(X_test)
+        preds2 = model.predict(X_test)
+        acc = accuracy_score(y_test, preds2)
+        conf_mat = confusion_matrix(y_test, preds2)
+        roc_auc = roc_auc_score(y_test, preds, multi_class='ovo')
+        accs.append(acc)
+        rocs.append(roc_auc)
+        conf_mats.append(conf_mat)
+    
+    print("Accuracy:", np.mean(accs))
+    print("ROC AUC:", np.mean(rocs))
+    print(np.shape(conf_mats))
+    print(conf_mats)
+    print(np.mean(conf_mats, axis=0))
+    fig, ax = plt.subplots()
+    disp = ConfusionMatrixDisplay.from_estimator(
+        model,
+        X_test,
+        y_test,
+        display_labels=datasets,
+        cmap=plt.cm.Blues,
+        normalize='true',
+        ax=ax
+    )
+    fig.savefig(os.path.join(experiment_folder, 'dataset_separation_hubert.pdf'))
+    plt.show()

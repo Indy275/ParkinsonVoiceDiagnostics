@@ -31,7 +31,7 @@ class SGD_model:
     
     
     def eval_monolingual(self, X_test):
-        preds = self.model.predict(X_test)
+        preds = self.model.predict_proba(X_test)
         return preds
 
     def eval_multilingual(self, base_X_test, tgt_X_test):
@@ -42,7 +42,7 @@ class SGD_model:
     def get_X_y(self, df, train=False):
         n_features = len(df.columns) - 5  # Ugly coding, but does the trick: all columns except last 4 are features
         X = df.loc[:, df.columns[:n_features]].values
-        X[np.isnan(X)] = 0
+        # X[np.isnan(X)] = 0
         y = df.loc[:, 'y'].values
         if train:
             return df, (X, y), n_features
